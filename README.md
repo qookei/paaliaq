@@ -36,6 +36,7 @@ Each of the following subdirectories has instructions on how to build
 it's contents:
 
  - `rtl` - The source code for the FPGA implementation of the chipset.
+ - `toolchain` - The source code for the toolchain (assembler, etc).
 
 ## License
 
