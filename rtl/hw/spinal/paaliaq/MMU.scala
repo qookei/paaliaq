@@ -60,18 +60,9 @@ case class MMU(numWays: Int, numSets: Int, pageSize: Int, initialMappings: Seq[(
 
 	val curPageOffset = io.vaddr.resize(offsetBits bits)
 	val curTag = (io.vaddr >> tagOffset).resize(tagBits bits)
-	val curSet = Reg(UInt(setBits bits))
+	val curSet = (io.vaddr >> offsetBits).resize(setBits bits)
 
-	val curWays = Vec(TlbEntry(tagBits bits, pageBits bits), numWays)
-	curWays.zipWithIndex.foreach({ case (w, i) => {
-		w.assignFromBits(ways(i)(curSet))
-	}})
-
-	val curWayIdx = (curWays.zipWithIndex.map({ case (w, i) => {
-		(w.tag === curTag) ? U(i).resize(wayBits bits) | 0
-	}}).reduce(_ | _))
-
-	val curEntry = curWays(curWayIdx)
+	val curEntry = Reg(TlbEntry(tagBits bits, pageBits bits))
 
 	/*
 
@@ -134,7 +125,14 @@ case class MMU(numWays: Int, numSets: Int, pageSize: Int, initialMappings: Seq[(
 	val faultReason = Reg(Bits(8 bits)) init 0
 
 	when(io.enable) {
-		curSet := (io.vaddr >> offsetBits).resize(setBits bits)
+		for (way <- ways) {
+			val wayEntry = TlbEntry(tagBits bits, pageBits bits)
+			wayEntry.assignFromBits(way(curSet))
+
+			when (wayEntry.tag === curTag) {
+				curEntry := wayEntry
+			}
+		}
 	}
 
 	val busIf = new Area {

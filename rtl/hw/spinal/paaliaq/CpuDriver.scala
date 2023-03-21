@@ -51,11 +51,10 @@ case class CpuDriver() extends Component {
 
 	val state = Reg(UInt(3 bits)) init 0
 
-	val vaddr = Reg(UInt(24 bits)) init 0
-	val rwb   = Reg(Bool()) init False
-	val vda   = Reg(Bool()) init False
-	val vpa   = Reg(Bool()) init False
-	val vpb   = Reg(Bool()) init False
+	val rwb = Reg(Bool()) init False
+	val vda = Reg(Bool()) init False
+	val vpa = Reg(Bool()) init False
+	val vpb = Reg(Bool()) init False
 
 	// Set to true when an abort is initiated, cleared when VDA=VPA=1 (vector entry sequence)
 	// We should ignore all I/O the CPU does if this is set
@@ -68,7 +67,7 @@ case class CpuDriver() extends Component {
 	busIo.enable.setAsReg()
 	busIo.paddr := mmuIo.paddr
 
-	mmuIo.vaddr := vaddr
+	mmuIo.vaddr.setAsReg()
 	mmuIo.enable.setAsReg()
 	mmuIo.rd.setAsReg()
 	mmuIo.wr.setAsReg()
@@ -87,7 +86,7 @@ case class CpuDriver() extends Component {
 			io.data.writeEnable := False
 		}
 		is(2) {
-			vaddr := (io.data.read ## io.addr).asUInt
+			mmuIo.vaddr := (io.data.read ## io.addr).asUInt
 			rwb := io.rwb
 			vda := io.vda
 			vpa := io.vpa
