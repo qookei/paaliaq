@@ -1,8 +1,8 @@
 # Paaliaq
 
 Paaliaq is a WDC W65C816-based single board computer with support for
-some modern features such as address translation, kernel/user
-priviledge separation and such.
+some modern features such as address translation, and kernel/user
+priviledge separation.
 
 ## (Planned) Specifications
 

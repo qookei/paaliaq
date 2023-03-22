@@ -4,7 +4,7 @@ This directory contains the sources for the FPGA implementation of the
 chipset.
 
 These sources use the [SpinalHDL](https://github.com/SpinalHDL/SpinalHDL)
-library, and as such is written in Scala, and generate output Verilog.
+library, and as such are written in Scala, and generate Verilog for synthesis.
 
 ## Building
 
