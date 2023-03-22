@@ -154,17 +154,17 @@ case class MMU(numWays: Int, numSets: Int, pageSize: Int, initialMappings: Seq[(
 
 		val tlbPart0 = Reg(UInt(8 bits)) init 0
 		val tlbPart1 = Reg(UInt(8 bits)) init 0
+		val tlbPart2 = Reg(UInt(8 bits)) init 0
 
 		when (io.enable & !stage) {
 			switch (io.rdwr) {
 				is(False) {
 					switch(io.paddr) {
 						is(0x000) { setIdx := io.wr_data.resized }
-						is(0x001) { wayIdx := io.wr_data.resized }
-						is(0x002) { tlbPart0 := io.wr_data }
-						is(0x003) { tlbPart1 := io.wr_data }
-						is(0x004) {
-							val entry = (io.wr_data
+						is(0x001) {
+							val wayIdx = io.wr_data.resize(wayBits bits)
+
+							val entry = (tlbPart2
 									## tlbPart1
 									## tlbPart0).resize(tlbEntrySize)
 
@@ -174,6 +174,9 @@ case class MMU(numWays: Int, numSets: Int, pageSize: Int, initialMappings: Seq[(
 								}})
 							}
 						}
+						is(0x002) { tlbPart0 := io.wr_data }
+						is(0x003) { tlbPart1 := io.wr_data }
+						is(0x004) { tlbPart2 := io.wr_data }
 					}
 				}
 				is(True) {
