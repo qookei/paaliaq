@@ -18,7 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 vim: ft=scheme et
 !#
 (add-to-load-path (dirname (current-filename)))
-(use-modules (ice-9 match) (ice-9 format) (srfi srfi-1) (ice-9 getopt-long) (ice-9 binary-ports) (rnrs bytevectors))
+(use-modules (ice-9 match) (ice-9 format) (srfi srfi-1) (srfi srfi-26)
+             (ice-9 getopt-long) (ice-9 binary-ports) (rnrs bytevectors))
 
 (define single-byte-opcodes
  `((php . #x08) (phd . #x0b) (clc . #x18) (tcs . #x1b)
@@ -175,10 +176,6 @@ vim: ft=scheme et
  (match (assoc insn table (lambda (insn alistcar) (eq? insn (car alistcar))))
   ((k . v) #t) (_ #f)))
 
-(define partial-apply (lambda preapply-args
- (lambda postapply-args
-  (apply (car preapply-args) `(,@(cdr preapply-args) ,@postapply-args)))))
-
 (define (label-decl? symbol)
  (and
   (symbol? symbol)
@@ -192,8 +189,8 @@ vim: ft=scheme et
        '.assume-xy-wide '.assume-xy-narrow) #f)
   ((or '.adjust-frame '.data) #t)
   ;; Real instructions
-  ((? (partial-apply in-list? single-byte-opcodes)) #f)
-  ((? (partial-apply in-list-without-mode? multi-byte-opcodes)) #t)
+  ((? (cut in-list? single-byte-opcodes <>)) #f)
+  ((? (cut in-list-without-mode? multi-byte-opcodes <>)) #t)
   (_ (error "Illegal insn:" insn))))
 
 (define (imm-size insn a-size xy-size)
@@ -218,14 +215,14 @@ vim: ft=scheme et
 
 (define (is-immediate? oper)
  (if (list? oper)
-  (not (any (partial-apply eq? (car oper)) all-addr-modes))
+  (not (any (cut eq? (car oper) <>) all-addr-modes))
   #t))
 
 (define (normalize-oper insn oper)
  (if (is-immediate? oper)
   (match insn
-   ((? (partial-apply in-list-without-mode? branch-opcodes)) `(rel ,oper))
-   ((? (partial-apply in-list-without-mode? jump-opcodes)) `(abs ,oper))
+   ((? (cut in-list-without-mode? branch-opcodes <>)) `(rel ,oper))
+   ((? (cut in-list-without-mode? jump-opcodes <>)) `(abs ,oper))
    (_ `(imm ,oper)))
   oper))
 
@@ -405,7 +402,7 @@ vim: ft=scheme et
 
 (define (relocate base-addr global-env bytes relocs local-env)
  (let ((env `(,@global-env
-              ,@(map (partial-apply relocate-label base-addr) local-env)))
+              ,@(map (cut relocate-label base-addr <>) local-env)))
        (cur-relocs relocs) (cur-bytes bytes))
   (while (not (null? cur-relocs))
    (match (car cur-relocs)
