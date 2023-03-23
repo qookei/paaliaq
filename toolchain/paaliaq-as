@@ -493,9 +493,9 @@ used as the list of bytes to write to the output.
 " (car args)))
    ((#f #f)
     (let ((bytes (load (canonicalize-path input-path)))
-          (output-file (if (eq? output-path "-")
+          (output-file (if (string=? output-path "-")
                         (current-output-port)
-                        (open-output-file output-path (string=? output-format "binary")))))
+                        (open-output-file output-path #:binary (string=? output-format "binary")))))
      (match output-format
       ("ascii" (format output-file "~{~2,'0x ~}\n" bytes))
       ("binary" (put-bytevector output-file (u8-list->bytevector bytes)))
