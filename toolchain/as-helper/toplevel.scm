@@ -18,11 +18,10 @@
      (define-syntax proc-kind
        (syntax-rules ()
 	 ((_ name params locals body ...)
-	  (match-let (((bytes relocs labels) (assemble `(body ...))))
-	    `(,'name . ((data . ,bytes)
-			(local-relocs . ,relocs)
-			(local-labels . ,labels)
-			(priv-env . ,(build-frame-env proc-ret-size `params `locals)))))))))))
+	  (let ((local-env (build-frame-env proc-ret-size `params `locals)))
+	    (match-let (((bytes relocs) (assemble `name local-env `(body ...))))
+	      `(,'name . ((data . ,bytes)
+			  (local-relocs . ,relocs)))))))))))
 
 (define-proc-syntax proc 2)
 (define-proc-syntax far-proc 3)
@@ -41,9 +40,6 @@
     (('reloc-branch offset stack-off sz expr)
      `(reloc-branch ,(+ by offset) ,stack-off ,sz ,expr))))
 
-(define (offset-label label-cell by)
-  (cons (car label-cell) (+ by (cdr label-cell))))
-
 (define (append-entry data entry)
   (let ((offset (length data)) (entry-name (car entry)) (entry-data (cdr entry)))
     `(,(append data (assoc-get-or-default 'data entry-data '()))
@@ -51,8 +47,6 @@
        (offset . ,offset)
        (data . ,(assoc-get-or-default 'data entry-data '()))
        (local-relocs . ,(map (cut offset-relocation <> offset) (assoc-get-or-default 'local-relocs entry-data '())))
-       (local-labels . ,(map (cut offset-label <> offset) (assoc-get-or-default 'local-labels entry-data '())))
-       (priv-env . ,(assoc-get-or-default 'priv-env entry-data '()))
        (pub-env  . ,(assoc-get-or-default 'pub-env entry-data '()))))))
 
 (define (nonnull-in-list? table key)
@@ -82,10 +76,8 @@
 	 (set! data
 	       (relocate
 		base-addr
-		`(,@symbol-table
-		  ,@(assoc-get-or-default 'priv-env (cdr entry) '()))
+		symbol-table
 		data
-		(assoc-get-or-default 'local-relocs (cdr entry) '())
-		(assoc-get-or-default 'local-labels (cdr entry) '()))))
+		(assoc-get-or-default 'local-relocs (cdr entry) '()))))
        actual-entries)
       data)))

@@ -1,9 +1,6 @@
 (define-module (as-helper relocate) #: export (relocate))
 (use-modules (ice-9 match) (srfi srfi-1) (srfi srfi-26) (as-helper utility))
 
-(define (relocate-label base-addr label-cell)
-  (cons (car label-cell) (+ base-addr (cdr label-cell))))
-
 (define (lookup-in-env name env)
   (match (assoc name env)
     ((k . v) v)
@@ -32,10 +29,8 @@
 (define (apply-patch-to-bytes bytes off patch)
   `(,@(take bytes off) ,@patch ,@(drop bytes (+ (length patch) off))))
 
-(define (relocate base-addr global-env bytes relocs local-env)
-  (let ((env `(,@global-env
-	       ,@(map (cut relocate-label base-addr <>) local-env)))
-	(cur-relocs relocs) (cur-bytes bytes))
+(define (relocate base-addr env bytes relocs)
+  (let ((cur-relocs relocs) (cur-bytes bytes))
     (while (not (null? cur-relocs))
       (match (car cur-relocs)
 	(('reloc-abs offset stack-off sz expr)

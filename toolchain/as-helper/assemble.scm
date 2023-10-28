@@ -310,8 +310,13 @@
   (if (has-operand? (car insns))
       `(,(car insns) ,(cadr insns)) (car insns)))
 
-(define (assemble insns)
-  (let ((cur-insns insns) (bytes '()) (relocs '()) (labels '()) (a-size 1) (xy-size 1) (stack-off 0))
+(define (transform-local-reloc sym local-alist reloc)
+  (match (assoc (cadr (cdddr reloc)) local-alist)
+    ((k . v) `(,(car reloc) ,(cadr reloc) ,(caddr reloc) ,(cadddr reloc) (+ ,sym ,v)))
+    (_ reloc)))
+
+(define (assemble sym locals insns)
+  (let ((cur-insns insns) (bytes '()) (relocs '()) (labels locals) (a-size 1) (xy-size 1) (stack-off 0))
     (while (not (null? cur-insns))
       (match (current-insn cur-insns)
 	('.assume-a-narrow (set! a-size 1))
@@ -334,4 +339,4 @@
 	(insn (set! bytes
 		    (append bytes (insn-to-opcode insn single-byte-opcodes)))))
       (set! cur-insns (skip-one-insn cur-insns)))
-    `(,bytes ,relocs ,labels)))
+    `(,bytes ,(map (cut transform-local-reloc sym labels <>) relocs))))
