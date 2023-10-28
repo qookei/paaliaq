@@ -1,0 +1,5 @@
+amaranth
+
+# No release yet
+amaranth-soc @ git+https://github.com/amaranth-lang/amaranth-soc
+amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards
