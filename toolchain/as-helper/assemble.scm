@@ -1,7 +1,8 @@
 (define-module (as-helper assemble) #: export (assemble))
 
 (use-modules (ice-9 match) (ice-9 format) (srfi srfi-1) (srfi srfi-26)
-	     (ice-9 binary-ports) (rnrs bytevectors))
+	     (ice-9 binary-ports) (rnrs bytevectors)
+	     (as-helper utility))
 
 (define single-byte-opcodes
   `((php . #x08) (phd . #x0b) (clc . #x18) (tcs . #x1b)
@@ -211,24 +212,6 @@
 
 (define (value-now value)
   (if (number? value) value 0))
-
-(define (value-to-n-bytes value n)
-  (map (lambda (i)
-	 (logand (ash value (* i -8)) #xff))
-       (iota n 0)))
-
-(define (branch-target-fits? offset len)
-  (match len
-    ('1 (and (>= offset -128) (< offset 128)))
-    ('2 (and (>= offset -32768) (< offset 32768)))
-    (_ (error "Illegal branch target width:" len))))
-
-(define (compute-branch-target pc len target)
-  ;; Target is computed relative to after the instruction
-  (let ((offset (- target (+ pc len))))
-    (if (branch-target-fits? offset len)
-	(value-to-n-bytes offset len)
-	(error "Branch target out of range:" offset))))
 
 (define (oper-to-bytes insn oper a-size xy-size)
   (match oper
