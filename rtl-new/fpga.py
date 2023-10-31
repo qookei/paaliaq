@@ -14,11 +14,11 @@ class FpgaTopLevel(Elaboratable):
 
         m.submodules += self.top
 
-        data_pins = platform.request('cpu_data', 0)
+        cpu_data_pins = platform.request('cpu_data', 0)
         m.d.sync += [
-            data_pins.oe.eq(self.top.cpu.cpu_data_oe),
-            data_pins.o.eq(self.top.cpu.cpu_data_o),
-            self.top.cpu.cpu_data_i.eq(data_pins.i)
+            cpu_data_pins.oe.eq(self.top.cpu.cpu_data_oe),
+            cpu_data_pins.o.eq(self.top.cpu.cpu_data_o),
+            self.top.cpu.cpu_data_i.eq(cpu_data_pins.i)
         ]
 
         m.d.sync += self.top.cpu.cpu_addr.eq(platform.request('cpu_addr', 0).i)
@@ -28,6 +28,18 @@ class FpgaTopLevel(Elaboratable):
         m.d.sync += self.top.cpu.cpu_vda.eq(platform.request('cpu_vda', 0).i)
         m.d.sync += self.top.cpu.cpu_vpa.eq(platform.request('cpu_vpa', 0).i)
         m.d.sync += self.top.cpu.cpu_rwb.eq(platform.request('cpu_rwb', 0).i)
+
+        ram_data_pins = platform.request('ram_data', 0)
+        m.d.sync += [
+            ram_data_pins.oe.eq(self.top.extram.ram_data_oe),
+            ram_data_pins.o.eq(self.top.extram.ram_data_o),
+            self.top.extram.ram_data_i.eq(ram_data_pins.i)
+        ]
+
+        m.d.sync += platform.request('ram_addr', 0).o.eq(self.top.extram.ram_addr)
+        m.d.sync += platform.request('ram_cs', 0).o.eq(self.top.extram.ram_cs)
+        m.d.sync += platform.request('ram_we', 0).o.eq(self.top.extram.ram_we)
+        m.d.sync += platform.request('ram_oe', 0).o.eq(self.top.extram.ram_oe)
 
         return m
 
@@ -55,6 +67,21 @@ class PaaliaqPlatform(LatticeICE40Platform):
                  Attrs(IO_STANDARD="SB_LVCMOS")),
 
         Resource("cpu_rwb", 0, Pins("42", dir="i"),
+                 Attrs(IO_STANDARD="SB_LVCMOS")),
+
+        Resource("ram_addr", 0, Pins("112 113 114 115 116 9 10 11 12 19 2 1 144 143 142 135 134 122 121 3 120", dir="o"),
+                 Attrs(IO_STANDARD="SB_LVCMOS")),
+
+        Resource("ram_data", 0, Pins("118 119 4 7 141 139 138 137", dir="io"),
+                 Attrs(IO_STANDARD="SB_LVCMOS")),
+
+        Resource("ram_cs", 0, Pins("117", dir="o"),
+                 Attrs(IO_STANDARD="SB_LVCMOS")),
+
+        Resource("ram_we", 0, Pins("8", dir="o"),
+                 Attrs(IO_STANDARD="SB_LVCMOS")),
+
+        Resource("ram_oe", 0, Pins("136", dir="o"),
                  Attrs(IO_STANDARD="SB_LVCMOS")),
 
         #*LEDResources(

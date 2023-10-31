@@ -5,13 +5,14 @@ from amaranth_soc.wishbone import *
 import math
 
 class RAM(Elaboratable):
-    def __init__(self, initial_contents):
-        self.data = Memory(width = 8, depth = len(initial_contents),
-                           init = initial_contents)
+    def __init__(self, init):
+        assert not (len(init) & (len(init) - 1))
+
+        self.data = Memory(width = 8, depth = len(init), init = init)
         self.r = self.data.read_port()
         self.w = self.data.write_port()
 
-        self.arb = Arbiter(addr_width=int(math.log2(len(initial_contents))),
+        self.arb = Arbiter(addr_width=int(math.log2(len(init))),
                            data_width=8)
 
     def new_bus(self):

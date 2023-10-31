@@ -4,6 +4,7 @@ from amaranth_soc.wishbone import *
 
 from cpu import CPUInterface
 from ram import RAM
+from extram import ExternalRAM
 
 def generate_boot_ram_contents():
     vector_table = [
@@ -28,7 +29,7 @@ def generate_boot_ram_contents():
 
     code = [
                           # 00FE00 reset:
-        0xE9,             # 00FE00   CLC
+        0x18,             # 00FE00   CLC
         0xFB,             # 00FE01   XCE
         0xA2, 0x00, 0xFF, # 00FE02   LDX #$FF00
         0x9A,             # 00FE05   TXS
@@ -45,9 +46,11 @@ def generate_boot_ram_contents():
 class TopLevel(Elaboratable):
     def __init__(self):
         self.ram = RAM(generate_boot_ram_contents())
+        self.extram = ExternalRAM(21)
 
         self.dec = Decoder(addr_width=24, data_width=8, granularity=8)
         self.dec.add(self.ram.new_bus(), addr=0x00FE00)
+        self.dec.add(self.extram.new_bus(), addr=0x010000)
 
         self.cpu = CPUInterface(self.dec)
 
@@ -55,6 +58,7 @@ class TopLevel(Elaboratable):
         m = Module()
 
         m.submodules += self.ram
+        m.submodules += self.extram
         m.submodules += self.cpu
 
         return m
@@ -65,6 +69,7 @@ if __name__ == '__main__':
     with open("top.v", "w") as f:
         top = TopLevel()
         f.write(verilog.convert(top, ports=[
+            # CPU connections
             top.cpu.cpu_addr,
             top.cpu.cpu_data_i,
             top.cpu.cpu_data_o,
@@ -74,5 +79,13 @@ if __name__ == '__main__':
             top.cpu.cpu_vda,
             top.cpu.cpu_vpa,
             top.cpu.cpu_vp,
-            top.cpu.cpu_abort
+            top.cpu.cpu_abort,
+            # External RAM connections
+            top.extram.ram_addr,
+            top.extram.ram_data_i,
+            top.extram.ram_data_o,
+            top.extram.ram_data_oe,
+            top.extram.ram_oe,
+            top.extram.ram_we,
+            top.extram.ram_cs,
         ]))
