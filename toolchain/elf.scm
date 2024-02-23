@@ -309,9 +309,8 @@
 
 ;; ! These relocations deviate from those proposed by llvm-mos and SNES-Dev !
 ;; The main difference is that the direct page is treated as temporary storage,
-;; or an extra register file of sorts, not backed by the executable, as such
-;; there is no support for placing symbols in it, and there are no relocations
-;; against it.
+;; or an extra register file of sorts, not backed by the executable, with no
+;; support for placing symbols in it, and there are no relocations against it.
 
 ;; Perhaps in the future we'll want to allow for this, in case we want to use
 ;; the direct page as more than just a register file (for which we don't need
