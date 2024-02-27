@@ -72,21 +72,34 @@
       (list 'from-to 0)])
    (cdr operand)))
 
-(define (%operand-reloc reloc symbol)
+(define (%regular-operand-reloc reloc symbol)
   (match symbol
     ;; Literal values
     [((? number? value))
      '()]
     ;; Symbol with an addend
     [((? symbol? symbol) (? number? addend))
+     (if (= reloc R_W65C816_NONE)
+	 (error "bailing out, refusing to emit R_W65C816_NONE" symbol addend))
      (list (make-elf-reloc -1 reloc (symbol->string symbol) addend))]
     ;; Just the symbol
     [((? symbol? symbol))
+     (if (= reloc R_W65C816_NONE)
+	 (error "bailing out, refusing to emit R_W65C816_NONE" symbol))
      (list (make-elf-reloc -1 reloc (symbol->string symbol) 0))]
     ;; Bank of the symbol
     [(#:bank (? symbol? symbol))
      (list (make-elf-reloc -1 R_W65C816_BANK (symbol->string symbol) 0))]
     [_ (error "illegal operand symbol" symbol)]))
+
+(define (%from-to-operand-reloc symbol)
+  (match symbol
+    ;; Literal values
+    [((? number? value) . rest)
+     (list '() rest)]
+    [(#:bank (? symbol? symbol) . rest)
+     (list (list (make-elf-reloc -1 R_W65C816_BANK (symbol->string symbol) 0)) rest)]
+    [_ (error "illegal operand(s) symbol for mvn/mvp" symbol)]))
 
 (define (%operand-value size symbol)
   (match (cons size symbol)
@@ -101,38 +114,28 @@
     [(2 . _) '(0 0)]
     [(3 . _) '(0 0 0)]))
 
-(define (%from-to-reloc symbol)
-  (match symbol
-    ;; Literal values
-    [((? number? value) . rest)
-     (list '() rest)]
-    [(#:bank (? symbol? symbol) . rest)
-     (list (list (make-elf-reloc -1 R_W65C816_BANK (symbol->string symbol) 0)) rest)]
-    [_ (error "illegal operand(s) symbol for mvn/mvp" symbol)]))
-
 (define (%reloc-and-bytes-for insn operand state)
   (match (%simplify-operand-kind insn operand state)
     [(0 'none) '()]
     [(1 'none (? number? value)) (%operand-value 1 value)]
     [(size 'abs . symbol)
-     (append (%operand-reloc
+     (append (%regular-operand-reloc
 	      (match size
-		[1 R_W65C816_NONE] ;; TODO: We should try and catch
-				   ;; this if it makes it out
+		[1 R_W65C816_NONE]
 		[2 R_W65C816_ABS16]
 		[3 R_W65C816_ABS24])
 	      symbol)
 	     (%operand-value size symbol))]
     [(size 'rel . symbol)
-     (append (%operand-reloc
+     (append (%regular-operand-reloc
 	      (match size
 		[1 R_W65C816_REL8]
 		[2 R_W65C816_REL16])
 	      symbol)
 	     (%operand-value size symbol))]
     [(0 'from-to . symbols)
-     (match-let* (([reloc1 rest1] (%from-to-reloc symbols))
-		  ([reloc2 rest2] (%from-to-reloc rest1)))
+     (match-let* (([reloc1 rest1] (%from-to-operand-reloc symbols))
+		  ([reloc2 rest2] (%from-to-operand-reloc rest1)))
        (if (null? rest2)
 	   (append reloc1 (%operand-value 1 symbols)
 		   reloc2 (%operand-value 1 rest1))
