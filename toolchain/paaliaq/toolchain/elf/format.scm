@@ -1,7 +1,7 @@
-(define-module (elf))
+(define-module (paaliaq toolchain elf format)
+  #:use-module (rnrs bytevectors)
+  #:use-module (rnrs bytevectors gnu))
 
-(use-modules (rnrs bytevectors)
-	     (rnrs bytevectors gnu))
 
 (define-syntax-rule (define-field name at size)
   (define-public name
@@ -96,7 +96,7 @@
 ;; --------------------
 
 (define-field p_type 0 4)
-(define	PT_NULL 0)
+(define-public PT_NULL 0)
 (define-public PT_LOAD 1)
 (define-public PT_DYNAMIC 2)
 (define-public PT_INTERP 3)
