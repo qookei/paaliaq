@@ -1,4 +1,4 @@
-(define-module (asm-tables)
+(define-module (paaliaq toolchain assembler tables)
   #:export (complex-opcodes
 	    simple-opcodes
 	    all-opcodes
