@@ -2,7 +2,13 @@
 
 (use-modules (ice-9 match) (srfi srfi-1) (srfi srfi-26)
 	     (srfi srfi-9) (srfi srfi-9 gnu)
-	     (ice-9 pretty-print) (asm-tables))
+	     (ice-9 pretty-print))
+
+
+(use-modules (paaliaq toolchain assembler tables))
+
+(use-modules (paaliaq toolchain elf defines))
+(use-modules (paaliaq toolchain elf format))
 
 (define-record-type <assy-state>
   (make-assy-state labels a-size xy-size offset)
@@ -82,13 +88,13 @@
      '()]
     ;; Symbol with an addend
     [((? symbol? symbol) (? number? addend))
-     (list (list reloc (symbol->string symbol) addend))]
+     (list (make-elf-reloc -1 reloc (symbol->string symbol) addend))]
     ;; Just the symbol
     [((? symbol? symbol))
-     (list (list reloc (symbol->string symbol) 0))]
+     (list (make-elf-reloc -1 reloc (symbol->string symbol) 0))]
     ;; Bank of the symbol
     [(#:bank (? symbol? symbol))
-     (list (list 'R_W65C816_BANK (symbol->string symbol) 0))]
+     (list (make-elf-reloc -1 R_W65C816_BANK (symbol->string symbol) 0))]
     [_ (error "illegal operand symbol" symbol)]))
 
 (define (%operand-value size symbol)
@@ -110,7 +116,7 @@
     [((? number? value) . rest)
      (list '() rest)]
     [(#:bank (? symbol? symbol) . rest)
-     (list (list (list 'R_W65C816_BANK (symbol->string symbol) 0)) rest)]
+     (list (list (make-elf-reloc -1 R_W65C816_BANK (symbol->string symbol) 0)) rest)]
     [_ (error "illegal operand(s) symbol for mvn/mvp" symbol)]))
 
 (define (%reloc-and-bytes-for insn operand state)
@@ -120,16 +126,17 @@
     [(size 'abs . symbol)
      (append (%operand-reloc
 	      (match size
-		[1 'THIS-SHOULDN'T-REACH-THE-ELF]
-		[2 'R_W65C816_ABS16]
-		[3 'R_W65C816_ABS24])
+		[1 R_W65C816_NONE] ;; TODO: We should try and catch
+				   ;; this if it makes it out
+		[2 R_W65C816_ABS16]
+		[3 R_W65C816_ABS24])
 	      symbol)
 	     (%operand-value size symbol))]
     [(size 'rel . symbol)
      (append (%operand-reloc
 	      (match size
-		[1 'R_W65C816_REL8]
-		[2 'R_W65C816_REL16])
+		[1 R_W65C816_REL8]
+		[2 R_W65C816_REL16])
 	      symbol)
 	     (%operand-value size symbol))]
     [(0 'from-to . symbols)
@@ -184,9 +191,12 @@
 (define (%lower-local-label-relocs proc-name input state)
   (map
    (λ (elem)
-     (if (list? elem) ;; TODO: elf-reloc?
-	 (match (assoc (second elem) (assy-labels state))
-	   [(_ . offset) (list (first elem) proc-name (third elem))]
+     (if (elf-reloc? elem)
+	 (match (assoc (elf-reloc-symbol-name elem) (assy-labels state))
+	   [(_ . offset)
+	    (set-fields elem
+			([elf-reloc-symbol-name] proc-name)
+			([elf-reloc-addend] (+ offset (elf-reloc-addend elem))))]
 	   [#f elem])
 	 elem))
    input))
