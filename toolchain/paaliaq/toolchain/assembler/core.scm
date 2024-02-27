@@ -1,14 +1,25 @@
-(define-module (asm2))
+(define-module (paaliaq toolchain assembler core)
+  #:use-module (paaliaq toolchain assembler tables)
+  #:use-module (paaliaq toolchain elf defines)
+  #:use-module (paaliaq toolchain elf format)
 
-(use-modules (ice-9 match) (srfi srfi-1) (srfi srfi-26)
-	     (srfi srfi-9) (srfi srfi-9 gnu)
-	     (ice-9 pretty-print))
+  #:use-module (ice-9 match)
+  #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-9)
+  #:use-module (srfi srfi-9 gnu)
+  #:use-module (srfi srfi-26)
 
+  #:export (make-assy-state
+	    assy-state?
+	    assy-labels
+	    assy-a-size
+	    assy-xy-size
+	    assy-offset
 
-(use-modules (paaliaq toolchain assembler tables))
+	    make-default-assy-state
 
-(use-modules (paaliaq toolchain elf defines))
-(use-modules (paaliaq toolchain elf format))
+	    assemble-many))
+
 
 (define-record-type <assy-state>
   (make-assy-state labels a-size xy-size offset)
@@ -19,32 +30,12 @@
   (xy-size assy-xy-size)
   (offset assy-offset))
 
+(define (make-default-assy-state)
+  (make-assy-state '() 1 1 0))
+
+;; -----------------------------------------------------------------------------
 
 ;; NOTE: We also emit single numbers for individual bytes instead of bytevectors
-
-(define (%normalize-operand insn operand)
-  (define (immediate? operand)
-    (if (list? operand)
-	(match (assoc (list insn (car operand)) complex-opcodes)
-	  [#f #t]
-	  [_ #f])
-	#t))
-
-  (define (into-normal body)
-    (if (list? body) body (list body)))
-
-  (match (list insn operand)
-    [('jsl (? immediate? (= into-normal imm)))
-     (cons 'far-abs imm)]
-    [((or 'jsr 'jmp) (? immediate? (= into-normal imm)))
-     (cons 'abs imm)]
-    [((? (cut member <> branch-instructions)) (? immediate? (= into-normal imm)))
-     (cons 'rel imm)]
-    [((or 'mvn 'mvp) (? immediate? (= into-normal imm)))
-     (cons 'seg-from-to imm)]
-    [(_ (? immediate? (= into-normal imm)))
-     (cons 'imm imm)]
-    [_ operand]))
 
 (define (%simplify-operand-kind insn operand state)
   (append-reverse
@@ -159,6 +150,32 @@
 			   (count number? operand-data)))))]
     [_ (error "no such instruction" insn (car operand))]))
 
+;; -----------------------------------------------------------------------------
+
+(define (%normalize-operand insn operand)
+  (define (immediate? operand)
+    (if (list? operand)
+	(match (assoc (list insn (car operand)) complex-opcodes)
+	  [#f #t]
+	  [_ #f])
+	#t))
+
+  (define (into-normal body)
+    (if (list? body) body (list body)))
+
+  (match (list insn operand)
+    [('jsl (? immediate? (= into-normal imm)))
+     (cons 'far-abs imm)]
+    [((or 'jsr 'jmp) (? immediate? (= into-normal imm)))
+     (cons 'abs imm)]
+    [((? (cut member <> branch-instructions)) (? immediate? (= into-normal imm)))
+     (cons 'rel imm)]
+    [((or 'mvn 'mvp) (? immediate? (= into-normal imm)))
+     (cons 'seg-from-to imm)]
+    [(_ (? immediate? (= into-normal imm)))
+     (cons 'imm imm)]
+    [_ operand]))
+
 (define (%handle-reg-size bits)
   (match bits
     [8 1]
@@ -186,7 +203,9 @@
     [((? (cut member <> complex-instructions) insn)
       (= (cut %normalize-operand insn <>) operand) . rest)
      (cons rest (%real-insn insn operand state))]
-    [_ (error "syntax error, unrecognized form" input)]))
+    [_ (error "unrecognized form" input)]))
+
+;; -----------------------------------------------------------------------------
 
 (define (%lower-local-label-relocs proc-name input state)
   (map
@@ -201,7 +220,7 @@
 	 elem))
    input))
 
-(define (%assemble-many proc-name input state)
+(define (assemble-many proc-name input state)
   (let loop ([input input]
 	     [output '()]
 	     [state state])
@@ -210,8 +229,8 @@
 	(match-let (([rest insn-output new-state] (%assemble-one input state)))
 	  (loop rest (append output insn-output) new-state)))))
 
-(pretty-print
- (%assemble-many
+(display
+ (assemble-many
   "foo"
   '(.a-bits 16
     lda #x42
@@ -226,4 +245,4 @@
     jsl (tbl +10)
     jml (ind-abs tbl +10)
    )
-  (make-assy-state '() 1 1 0)))
+  (make-default-assy-state)))
