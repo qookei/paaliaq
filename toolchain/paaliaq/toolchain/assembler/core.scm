@@ -231,21 +231,3 @@
 	(list (%lower-local-label-relocs proc-name output state) state)
 	(match-let (([rest insn-output new-state] (%assemble-one input state)))
 	  (loop rest (append output insn-output) new-state)))))
-
-(display
- (assemble-many
-  "foo"
-  '(.a-bits 16
-    lda #x42
-  #:x
-    sta (dp #x12)
-    bra x
-    brl x
-    lda (imm #:bank asdf)
-    nop
-    mvn (#:bank foo #:bank bar)
-    jmp (tbl +10)
-    jsl (tbl +10)
-    jml (ind-abs tbl +10)
-   )
-  (make-default-assy-state)))
