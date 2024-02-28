@@ -1,4 +1,5 @@
 (define-module (paaliaq toolchain elf emit)
+  #:use-module (paaliaq toolchain elf sections)
   #:use-module (paaliaq toolchain elf defines)
   #:use-module (paaliaq toolchain elf format)
   ;; Only select {open,get}-output-bytevector to avoid warnings
@@ -69,59 +70,6 @@
 
     (put-bytevector port ehdr-bv)))
 
-(define (%generate-rela-data symtab-hash relocs)
-  (let ([rela-port (open-output-bytevector)])
-    (for-each
-     (λ (rel)
-       (let ([rela-bv (make-bytevector +sizeof-rela+)])
-	 (set! (r_offset rela-bv) (elf-reloc-offset rel))
-	 (set! (r_info rela-bv)
-	       (ELF32_R_INFO (hash-ref symtab-hash (elf-reloc-symbol-name rel))
-			     (elf-reloc-type rel)))
-	 (set! (r_addend rela-bv) (elf-reloc-addend rel))
-	 (put-bytevector rela-port rela-bv)))
-     relocs)
-    (get-output-bytevector rela-port)))
-
-(define (%.text syms relocs data)
-  (make-elf-scn SHT_PROGBITS
-		".text"
-		(+ SHF_ALLOC SHF_EXECINSTR)
-		data syms relocs
-		SHN_UNDEF SHN_UNDEF
-		1 0))
-
-(define (%.rela tgt-name tgt-idx symtab-idx symtab-hash relocs)
-  (make-elf-scn SHT_RELA
-		(string-append ".rela" tgt-name)
-		(+ SHF_INFO_LINK)
-		(%generate-rela-data symtab-hash relocs) '() '()
-		symtab-idx tgt-idx
-		4 +sizeof-rela+))
-
-(define (%.strtab name strtab-bv)
-  (make-elf-scn SHT_STRTAB
-		name
-		0
-		strtab-bv '() '()
-		SHN_UNDEF SHN_UNDEF
-		1 0))
-
-(define (%.symtab symtab-bv strtab-idx)
-  (make-elf-scn SHT_SYMTAB
-		".symtab"
-		0
-		symtab-bv '() '()
-		strtab-idx 1 ;; TODO: index of last STB_LOCAL symbol + 1
-		4 +sizeof-sym+))
-
-(define (%.null)
-  (make-elf-scn SHT_NULL
-		""
-		0
-		#vu8() '() '()
-		SHN_UNDEF SHN_UNDEF
-		0 0))
 
 (define (%emit-sym port sym scn-idx intern-strtab! symtab-hash)
   (let ([sym-bv (make-bytevector +sizeof-sym+)])
@@ -164,7 +112,7 @@
     (intern-strtab "")
 
     ;; Emit the null section at index 0
-    (%emit-section (%.null) intern-shstrtab shdr-port data-port)
+    (%emit-section ($.null) intern-shstrtab shdr-port data-port)
 
     ;; Emit an empty symbol at index 0
     (%emit-sym symtab-port
@@ -206,15 +154,15 @@
      rela-scns)
 
     ;; Emit .strtab and all the sections that link to it
-    (let* ([strtab-idx (emit-scn (%.strtab ".strtab"
+    (let* ([strtab-idx (emit-scn ($.strtab ".strtab"
 					   (get-output-bytevector strtab-port)))]
 	   ;; We need the index of the symbol table for the link in .rela
-	   [symtab-idx (emit-scn (%.symtab (get-output-bytevector symtab-port)
+	   [symtab-idx (emit-scn ($.symtab (get-output-bytevector symtab-port)
 					   strtab-idx))])
       ;; Emit all the .rela sections
       (hash-for-each
        (λ (scn-name info)
-	 (emit-scn (%.rela scn-name
+	 (emit-scn ($.rela scn-name
 			   (car info)
 			   symtab-idx
 			   symtab-hash
@@ -225,7 +173,7 @@
     ;; Finally, emit .shstrtab itself
     ;; Intern the string so that we don't modify the string table anymore
     (intern-shstrtab ".shstrtab")
-    (let ([shstrtab-idx (emit-scn (%.strtab ".shstrtab"
+    (let ([shstrtab-idx (emit-scn ($.strtab ".shstrtab"
 					    (get-output-bytevector shstrtab-port)))])
       ;; Now that we've emitted all the sections, piece the file together
       ;; First the Ehdr ...
