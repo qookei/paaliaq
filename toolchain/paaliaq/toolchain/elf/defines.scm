@@ -7,6 +7,7 @@
 	    elf-symbol-binding
 	    elf-symbol-type
 	    elf-symbol-visibility
+	    elf-symbol-size
 
 	    make-elf-reloc
 	    elf-reloc?
@@ -30,14 +31,15 @@
 
 
 (define-record-type <elf-symbol>
-  (make-elf-symbol name offset binding type visibility)
+  (make-elf-symbol name offset binding type visibility size)
   elf-symbol?
 
   (name elf-symbol-name)
   (offset elf-symbol-offset)
   (binding elf-symbol-binding)
   (type elf-symbol-type)
-  (visibility elf-symbol-visibility))
+  (visibility elf-symbol-visibility)
+  (size elf-symbol-size))
 
 
 (define-record-type <elf-reloc>

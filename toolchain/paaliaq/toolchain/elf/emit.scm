@@ -75,7 +75,7 @@
   (let ([sym-bv (make-bytevector +sizeof-sym+)])
     (set! (st_name sym-bv) (intern-strtab! (elf-symbol-name sym)))
     (set! (st_value sym-bv) (elf-symbol-offset sym))
-    (set! (st_size sym-bv) 0) ;; ??
+    (set! (st_size sym-bv) (elf-symbol-size sym))
     (set! (st_info sym-bv) (ELF32_ST_INFO (elf-symbol-binding sym)
 					  (elf-symbol-type sym)))
     (set! (st_other sym-bv) (elf-symbol-visibility sym))
@@ -116,7 +116,7 @@
 
     ;; Emit an empty symbol at index 0
     (%emit-sym symtab-port
-	       (make-elf-symbol "" 0 0 0 0)
+	       (make-elf-symbol "" 0 0 0 0 0)
 	       SHN_UNDEF intern-strtab symtab-hash)
 
     ;; Emit all the user-provided sections
@@ -148,7 +148,8 @@
 					  0
 					  STB_GLOBAL
 					  STT_NOTYPE
-					  STV_DEFAULT)
+					  STV_DEFAULT
+					  0)
 			 SHN_UNDEF intern-strtab symtab-hash)))
 	(cdr info)))
      rela-scns)
