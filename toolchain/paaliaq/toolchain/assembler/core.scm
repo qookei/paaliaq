@@ -18,7 +18,8 @@
 
 	    make-default-assy-state
 
-	    assemble-many))
+	    assemble-many
+	    assemble))
 
 
 (define-record-type <assy-state>
@@ -231,3 +232,6 @@
 	(list (%lower-local-label-relocs proc-name output state) state)
 	(match-let (([rest insn-output new-state] (%assemble-one input state)))
 	  (loop rest (append output insn-output) new-state)))))
+
+(define (assemble proc-name input)
+  (car (assemble-many proc-name input (make-default-assy-state))))
