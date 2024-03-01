@@ -147,7 +147,7 @@
 
 
 (define misc-opcodes
-  '([(brk imm         ) . #x00] [(cop imm         ) . #x00] [(mvp seg-from-to ) . #x44]
+  '([(brk imm         ) . #x00] [(cop imm         ) . #x02] [(mvp seg-from-to ) . #x44]
     [(mvn seg-from-to ) . #x54]))
 
 

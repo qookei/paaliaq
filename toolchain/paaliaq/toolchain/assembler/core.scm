@@ -37,8 +37,6 @@
 
 ;; -----------------------------------------------------------------------------
 
-;; NOTE: We also emit single numbers for individual bytes instead of bytevectors
-
 (define (%simplify-operand-kind insn operand state)
   (append-reverse
    (match (list insn (car operand))
