@@ -1,76 +1,15 @@
-#!/usr/bin/env -S guile --no-auto-compile -e main -s
-Paaliaq - 65c816 assembler
-Copyright (C) 2023  qookie
+#!/usr/bin/env bash
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License, as published
-by the Free Software Foundation, either version 3 of the License, or
-(at your opinion) any later version.
+SCRIPTDIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+# We disable automatic compilation here to avoid noisy output from
+# Guile, which likes to tell the user that a file was recompiled.
+# Compilation doesn't really matter much here anyway, this is not that
+# much code.
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-vim: ft=scheme et
-!#
-(add-to-load-path (dirname (current-filename)))
-(use-modules (ice-9 match) (ice-9 format) (srfi srfi-1) (srfi srfi-26)
-	     (ice-9 getopt-long) (ice-9 binary-ports) (rnrs bytevectors))
-
-(define (first-or-error value error-msg)
-  (if (null? value)
-      (error error-msg)
-      (car value)))
-
-(define (main args)
-  (let* ((option-spec '((version (single-char #\v) (value #f))
-			(help    (single-char #\h) (value #f))
-			(output  (single-char #\o) (value #t))
-			(format  (single-char #\f) (value #t))))
-	 (options (getopt-long args option-spec))
-	 (input-path    (first-or-error (option-ref options '() '())
-					(format #f "~a: Missing required positional argument: FILE" (car args))))
-	 (want-version  (option-ref options 'version #f))
-	 (want-help     (option-ref options 'help #f))
-	 (output-path   (option-ref options 'output "-"))
-	 (output-format (option-ref options 'format "ascii")))
-    (match `(,want-version ,want-help)
-      ((#t _) (display "\
-as (paaliaq as) 0.1
-Copyright (C) 2023  qookie
-License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
-This is free software: you are free to change and redistribute it.
-There is NO WARRANTY, to the extent permitted by law.
-"))
-      ((#f #t) (format #t "\
-~a [OPTION]... FILE
-Load and evaluate FILE with assembler facilities in scope.
-
-Output control:
-  -f, --format=FORMAT  write output using the specified FORMAT;
-		       FORMAT is either binary or ascii (default: ascii)
-  -o, --output=FILE    write the output to FILE (\"-\" to write to standard
-		       output, which is the default)
-
-Miscellaneous:
-  -v, --version        display the version information and exit
-  -h, --help           display this help message and exit
-
-The input FILE is evaluated with the core assembler functionality in scope, and
-with helper modules are within the %load-path. The result of the evaluation is
-used as the list of bytes to write to the output.
-" (car args)))
-      ((#f #f)
-       (let ((bytes (load (canonicalize-path input-path)))
-	     (output-file (if (string=? output-path "-")
-			      (current-output-port)
-			      (open-output-file output-path
-						#:binary (string=? output-format "binary")))))
-	 (match output-format
-	   ("ascii" (format output-file "~{~2,'0x ~}\n" bytes))
-	   ("binary" (put-bytevector output-file (u8-list->bytevector bytes)))
-	   (_ ("Illegal output format:" output-format))))))))
+exec ${GUILE:-guile} \
+     --no-auto-compile \
+     -L "${SCRIPTDIR}" \
+     -e main \
+     -s "${SCRIPTDIR}/paaliaq/toolchain/assembler.scm" \
+     $@
