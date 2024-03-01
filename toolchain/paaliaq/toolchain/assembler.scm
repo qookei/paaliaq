@@ -20,12 +20,14 @@ paaliaq-as [OPTION]... FILE
 Evaluate FILE with assembler facilities in scope and emit an object file.
 
 Output control:
-  -o, --output=FILE  write the output to FILE (default is input file name with
-                     a `.o' extension suffixed to it)
+  -o, --output=FILE     write the output to FILE (default is `a.out')
+
+Input control:
+  -l, --load-path=PATH  add PATH to the %load-path
 
 Miscellaneous:
-  -v, --version      display the version information and exit
-  -h, --help         display this help message and exit
+  -v, --version         display the version information and exit
+  -h, --help            display this help message and exit
 
 The input FILE is evaluated with the assembler DSL in scope, and with the
 toolchain path added to %load-path. The result of the input evaluation is used
@@ -37,9 +39,10 @@ wrapper script.
 
 
 (define (main args)
-  (let* ([option-spec '[(version (single-char #\v) (value #f))
-			(help    (single-char #\h) (value #f))
-			(output  (single-char #\o) (value #t))]]
+  (let* ([option-spec '([version   (single-char #\v) (value #f)]
+			[help      (single-char #\h) (value #f)]
+			[output    (single-char #\o) (value #t)]
+			[load-path (single-char #\l) (value #t)])]
 	 [options (getopt-long args option-spec)])
     (match (list (option-ref options 'version #f)
 		 (option-ref options 'help #f)
@@ -48,8 +51,8 @@ wrapper script.
       [(#f #t _) (help)]
       [(#f #f '()) (error "missing required positional argument: FILE")]
       [(#f #f (input-path . _))
-       (let ([output-name (option-ref options 'output
-				      (string-append (basename input-path) ".o"))]
+       (add-to-load-path (option-ref options 'load-path ""))
+       (let ([output-name (option-ref options 'output "a.out")]
 	     [body (load (canonicalize-path input-path))])
 	 (if (string=? input-path output-name)
 	     (error "bailing out, refusing to overwrite input file with output file" input-path)
