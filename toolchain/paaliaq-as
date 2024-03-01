@@ -4,8 +4,9 @@ SCRIPTDIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
 # We disable automatic compilation here to avoid noisy output from
 # Guile, which likes to tell the user that a file was recompiled.
-# Compilation doesn't really matter much here anyway, this is not that
-# much code.
+# Recompilation doesn't really matter much here anyway, this is not
+# that much code, and the user can precompile all of the toolchain
+# sources using `guild compile'.
 
 exec ${GUILE:-guile} \
      --no-auto-compile \
