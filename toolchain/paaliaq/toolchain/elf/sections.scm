@@ -94,10 +94,12 @@
 		1 0))
 
 
-(define ($.bss syms size)
+(define ($.bss syms relocs data)
+  (if (not (null? relocs))
+      (error "bailing out, tried to put relocations in bss" relocs))
   (make-elf-scn SHT_NOBITS
 		".bss"
 		(+ SHF_ALLOC SHF_WRITE)
-		(make-bytevector size) syms '()
+		data syms '()
 		SHN_UNDEF SHN_UNDEF
 		1 0))
