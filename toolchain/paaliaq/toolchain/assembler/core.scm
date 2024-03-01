@@ -207,7 +207,18 @@
     [((? (cut member <> complex-instructions) insn)
       (= (cut %normalize-operand insn <>) operand) . rest)
      (cons rest (%real-insn insn operand state))]
+    [((? list? sublist) . rest)
+     (cons rest (%assemble-many sublist state))]
     [_ (error "unrecognized form" input)]))
+
+(define (%assemble-many input state)
+  (let loop ([input input]
+	     [output '()]
+	     [state state])
+    (if (null? input)
+	(list output state)
+	(match-let (([rest insn-output new-state] (%assemble-one input state)))
+	  (loop rest (append output insn-output) new-state)))))
 
 ;; -----------------------------------------------------------------------------
 
@@ -225,13 +236,8 @@
    input))
 
 (define (assemble-many proc-name input state)
-  (let loop ([input input]
-	     [output '()]
-	     [state state])
-    (if (null? input)
-	(list (%lower-local-label-relocs proc-name output state) state)
-	(match-let (([rest insn-output new-state] (%assemble-one input state)))
-	  (loop rest (append output insn-output) new-state)))))
+  (match-let ([(output state) (%assemble-many input state)])
+    (list (%lower-local-label-relocs proc-name output state) state)))
 
 (define (assemble proc-name input)
   (car (assemble-many proc-name input (make-default-assy-state))))
