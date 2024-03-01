@@ -19,7 +19,8 @@
 	    make-default-assy-state
 
 	    assemble-many
-	    assemble))
+	    assemble
+	    data-table))
 
 
 (define-record-type <assy-state>
@@ -113,7 +114,8 @@
     ;; Anything else
     [(1 . _) '(0)]
     [(2 . _) '(0 0)]
-    [(3 . _) '(0 0 0)]))
+    [(3 . _) '(0 0 0)]
+    [(4 . _) '(0 0 0 0)]))
 
 (define (%reloc-and-bytes-for insn operand state)
   (match (%simplify-operand-kind insn operand state)
@@ -235,3 +237,23 @@
 
 (define (assemble proc-name input)
   (car (assemble-many proc-name input (make-default-assy-state))))
+
+;; -----------------------------------------------------------------------------
+
+(define (data-table item-size input)
+  (map
+   (compose
+    (λ (item)
+      (append (%regular-operand-reloc
+	       (match item-size
+		 [1 R_W65C816_NONE]
+		 [2 R_W65C816_ABS16]
+		 [3 R_W65C816_ABS24]
+		 [4 R_W65C816_NONE])
+	       item)
+	      (%operand-value item-size item)))
+    (λ (item)
+      (if (list? item)
+	  item
+	  (list item))))
+   input))
