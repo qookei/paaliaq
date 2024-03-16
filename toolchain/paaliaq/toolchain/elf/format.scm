@@ -189,7 +189,7 @@
 (define-public (ELF32_ST_INFO bind type) (logior (ash bind 4) (logand type #x0f)))
 
 (define-field st_other 13 1)
-(define-public (ELF32_ST_VISIBILITY val) (logior val #x03))
+(define-public (ELF32_ST_VISIBILITY val) (logand val #x03))
 (define-public STV_DEFAULT 0)
 (define-public STV_INTERNAL 1)
 (define-public STV_HIDDEN 2)
