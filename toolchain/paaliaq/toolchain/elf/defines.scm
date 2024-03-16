@@ -21,6 +21,7 @@
 	    elf-scn-type
 	    elf-scn-name
 	    elf-scn-flags
+	    elf-scn-addr
 	    elf-scn-data
 	    elf-scn-syms
 	    elf-scn-relocs
@@ -53,12 +54,13 @@
 
 
 (define-record-type <elf-scn>
-  (make-elf-scn type name flags data syms relocs link info addralign entsize)
+  (make-elf-scn type name flags addr data syms relocs link info addralign entsize)
   elf-scn?
 
   (type elf-scn-type)
   (name elf-scn-name)
   (flags elf-scn-flags)
+  (addr elf-scn-addr)
   (data elf-scn-data)
   (syms elf-scn-syms)
   (relocs elf-scn-relocs)

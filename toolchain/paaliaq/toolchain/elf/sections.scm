@@ -20,7 +20,7 @@
 (define ($.null)
   (make-elf-scn SHT_NULL
 		""
-		0
+		0 0
 		#vu8() '() '()
 		SHN_UNDEF SHN_UNDEF
 		0 0))
@@ -29,7 +29,7 @@
 (define ($.strtab name strtab-bv)
   (make-elf-scn SHT_STRTAB
 		name
-		0
+		0 0
 		strtab-bv '() '()
 		SHN_UNDEF SHN_UNDEF
 		1 0))
@@ -38,7 +38,7 @@
 (define ($.symtab symtab-bv strtab-idx)
   (make-elf-scn SHT_SYMTAB
 		".symtab"
-		0
+		0 0
 		symtab-bv '() '()
 		strtab-idx 1 ;; TODO: index of last STB_LOCAL symbol + 1
 		4 +sizeof-sym+))
@@ -61,7 +61,7 @@
 (define ($.rela tgt-name tgt-idx symtab-idx symtab-hash relocs)
   (make-elf-scn SHT_RELA
 		(string-append ".rela" tgt-name)
-		(+ SHF_INFO_LINK)
+		(+ SHF_INFO_LINK) 0
 		(%generate-rela-data symtab-hash relocs) '() '()
 		symtab-idx tgt-idx
 		4 +sizeof-rela+))
@@ -70,7 +70,7 @@
 (define ($.text syms relocs data)
   (make-elf-scn SHT_PROGBITS
 		".text"
-		(+ SHF_ALLOC SHF_EXECINSTR)
+		(+ SHF_ALLOC SHF_EXECINSTR) 0
 		data syms relocs
 		SHN_UNDEF SHN_UNDEF
 		1 0))
@@ -79,7 +79,7 @@
 (define ($.rodata syms relocs data)
   (make-elf-scn SHT_PROGBITS
 		".rodata"
-		(+ SHF_ALLOC)
+		(+ SHF_ALLOC) 0
 		data syms relocs
 		SHN_UNDEF SHN_UNDEF
 		1 0))
@@ -88,7 +88,7 @@
 (define ($.data syms relocs data)
   (make-elf-scn SHT_PROGBITS
 		".data"
-		(+ SHF_ALLOC SHF_WRITE)
+		(+ SHF_ALLOC SHF_WRITE) 0
 		data syms relocs
 		SHN_UNDEF SHN_UNDEF
 		1 0))
@@ -99,7 +99,7 @@
       (error "bailing out, tried to put relocations in bss" relocs))
   (make-elf-scn SHT_NOBITS
 		".bss"
-		(+ SHF_ALLOC SHF_WRITE)
+		(+ SHF_ALLOC SHF_WRITE) 0
 		data syms '()
 		SHN_UNDEF SHN_UNDEF
 		1 0))

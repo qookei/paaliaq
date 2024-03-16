@@ -69,6 +69,7 @@
 	   (sh_type shdr-bv)
 	   (%read-string-table port shoff shstrndx (sh_name shdr-bv))
 	   (sh_flags shdr-bv)
+	   (sh_addr shdr-bv)
 	   (if (= (sh_type shdr-bv) SHT_NOBITS)
 	       (make-bytevector (sh_size shdr-bv))
 	       (%read-bytes-at (sh_offset shdr-bv) (sh_size shdr-bv) port))

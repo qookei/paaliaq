@@ -31,7 +31,7 @@
     (set! (sh_name scn-bv) (intern-shstrtab! (elf-scn-name scn)))
     (set! (sh_flags scn-bv) (elf-scn-flags scn))
 
-    (set! (sh_addr scn-bv) 0)
+    (set! (sh_addr scn-bv) (elf-scn-addr scn))
     (set! (sh_offset scn-bv) (+ +sizeof-ehdr+ (ftell data-port))) ;; TODO
     (set! (sh_size scn-bv) (bytevector-length (elf-scn-data scn)))
 
