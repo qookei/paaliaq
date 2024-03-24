@@ -48,7 +48,7 @@
     (put-bytevector shdr-port scn-bv)
     scn-idx))
 
-(define (%emit-ehdr port shoff shnum shstrndx)
+(define (%emit-ehdr port shoff shnum shstrndx type entry)
   (let ([ehdr-bv (make-bytevector +sizeof-ehdr+)])
     (set! (ei_mag ehdr-bv) EI_MAG)
     (set! (ei_class ehdr-bv) ELFCLASS32)
@@ -56,10 +56,11 @@
     (set! (ei_version ehdr-bv) EV_CURRENT)
     (set! (ei_osabi ehdr-bv) ELFOSABI_SYSV) ;; ??
 
-    (set! (e_type ehdr-bv) ET_REL)
+    (set! (e_type ehdr-bv) type)
     (set! (e_machine ehdr-bv) EM_65816)
     (set! (e_version ehdr-bv) EV_CURRENT)
 
+    (set! (e_entry ehdr-bv) entry)
     (set! (e_shoff ehdr-bv) shoff)
     (set! (e_shnum ehdr-bv) shnum)
     (set! (e_shstrndx ehdr-bv) shstrndx)
@@ -83,7 +84,7 @@
     (hash-set! symtab-hash (elf-symbol-name sym) (/ (ftell port) +sizeof-sym+))
     (put-bytevector port sym-bv)))
 
-(define (emit-elf-object port sections)
+(define* (emit-elf-object port sections #:key (type ET_REL) (entry 0))
   (letrec ([data-port (open-output-bytevector)]
 	   [shdr-port (open-output-bytevector)]
 	   ;; .shstrtab string interning
@@ -181,7 +182,8 @@
       (%emit-ehdr port
 		  (+ +sizeof-ehdr+ (ftell data-port))
 		  (hash-count (const #t) shstrtab-hash)
-		  shstrtab-idx)
+		  shstrtab-idx
+		  type entry)
       ;; ... then the data ...
       (put-bytevector port (get-output-bytevector data-port))
       ;; ... then the section table
