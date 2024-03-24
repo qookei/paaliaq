@@ -118,7 +118,7 @@
 (define (%reloc-and-bytes-for insn operand state)
   (match (%simplify-operand-kind insn operand state)
     [(0 'none) '()]
-    [(1 'none (? number? value)) (%operand-value 1 value)]
+    [(1 'none (? number? value)) (%operand-value 1 (list value))]
     [(size 'abs . symbol)
      (append (%regular-operand-reloc
 	      (match size
