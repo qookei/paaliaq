@@ -159,9 +159,11 @@
 (define (%normalize-operand insn operand)
   (define (immediate? operand)
     (if (list? operand)
-	(match (assoc (list insn (car operand)) complex-opcodes)
-	  [#f #t]
-	  [_ #f])
+	(if (member (car operand) (map cadar complex-opcodes))
+	    (match (assoc (list insn (car operand)) complex-opcodes)
+	      [#f (error "Illegal addressing mode for instruction" insn (car operand))]
+	      [_ #f])
+	    #t)
 	#t))
 
   (define (into-normal body)
