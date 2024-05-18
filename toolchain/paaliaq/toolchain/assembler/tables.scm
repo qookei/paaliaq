@@ -148,7 +148,7 @@
 
 (define misc-opcodes
   '([(brk imm         ) . #x00] [(cop imm         ) . #x02] [(mvp seg-from-to ) . #x44]
-    [(mvn seg-from-to ) . #x54]))
+    [(mvn seg-from-to ) . #x54] [(wdm imm         ) . #x42]))
 
 
 (define complex-opcodes
@@ -166,7 +166,7 @@
   '([(php none        ) . #x08] [(phd none        ) . #x0b] [(clc none        ) . #x18]
     [(tcs none        ) . #x1b] [(plp none        ) . #x28] [(pld none        ) . #x2b]
     [(sec none        ) . #x38] [(tsc none        ) . #x3b] [(rti none        ) . #x40]
-    [(wdm none        ) . #x42] [(pha none        ) . #x48] [(phk none        ) . #x4b]
+    [(pha none        ) . #x48] [(phk none        ) . #x4b] [(txy none        ) . #x9b]
     [(cli none        ) . #x58] [(phy none        ) . #x5a] [(tcd none        ) . #x5b]
     [(rts none        ) . #x60] [(pla none        ) . #x68] [(rtl none        ) . #x6b]
     [(sei none        ) . #x78] [(ply none        ) . #x7a] [(tdc none        ) . #x7b]
@@ -176,7 +176,7 @@
     [(tyx none        ) . #xbb] [(wai none        ) . #xcb] [(cld none        ) . #xd8]
     [(phx none        ) . #xda] [(stp none        ) . #xdb] [(nop none        ) . #xea]
     [(xba none        ) . #xeb] [(sed none        ) . #xf8] [(plx none        ) . #xfa]
-    [(xce none        ) . #xfb] [(txy none        ) . #x9b]))
+    [(xce none        ) . #xfb]))
 
 
 (define all-opcodes

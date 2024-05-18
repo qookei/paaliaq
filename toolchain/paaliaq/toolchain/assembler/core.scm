@@ -51,7 +51,7 @@
      ;; Immediate
      [((or 'ldx 'ldy 'cpx 'cpy) 'imm)
       (list 'abs (assy-xy-size state))]
-     [((or 'rep 'sep 'brk 'cop) 'imm)
+     [((or 'rep 'sep 'brk 'cop 'wdm) 'imm)
       (list 'abs 1)]
      [('phe 'imm)
       (list 'abs 2)]
