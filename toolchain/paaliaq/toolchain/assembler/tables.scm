@@ -139,7 +139,7 @@
 
 
 (define push-opcodes
-  '([(phe imm         ) . #xf4] [(phe rel         ) . #x62] [(phe ind-dp      ) . #xd4]))
+  '([(phe imm         ) . #xf4] [(phe rel         ) . #x62] [(phe dp          ) . #xd4]))
 
 
 (define flag-opcodes

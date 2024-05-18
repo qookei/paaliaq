@@ -63,7 +63,7 @@
      [(_ (or 'abs 'ind-abs 'ind-x-abs 'x-abs 'y-abs))
       (list 'abs 2)]
      ;; Relative
-     [('brl 'rel)
+     [((or 'brl 'phe) 'rel)
       (list 'rel 2)]
      [(_ 'rel)
       (list 'rel 1)]
