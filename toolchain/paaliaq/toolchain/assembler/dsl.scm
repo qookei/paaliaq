@@ -23,7 +23,17 @@
 	    .word
 	    .fword
 	    .dword
-	    .zero))
+	    .zero
+
+	    random-label
+	    label-decl
+
+	    proc-prologue
+	    proc-epilogue
+
+	    local
+	    param
+	    y-ind-param))
 
 
 (define (%data-size body)
@@ -133,3 +143,64 @@
 			   STV_DEFAULT
 			   size)
 	  (bytevector->u8-list (make-bytevector size)))))
+
+
+(define (random-label)
+  (string->symbol
+   (format #f
+	   "anon-label-~a"
+	   (random #e1e16))))
+
+(define (label-decl label)
+  (symbol->keyword label))
+
+
+(define (proc-prologue locals)
+  `(phd					; Push previous DP
+    .a-bits 16 .xy-bits 16
+    tsc
+    ;; If there are any locals, make room for them
+    ,(if (> locals 0)
+	 `(sec
+	   sbc ,locals
+	   tcs)				; SP -= locals
+	 '())
+    inc (a-reg)
+    tcd))				; DP = SP + 1
+
+(define* (proc-epilogue locals #:key a x y carry?)
+  ;; If there are any locals, get rid of them
+  `(,(if (> locals 0)
+	 `(tsc
+	   clc
+	   adc ,locals
+	   tcs)				; SP += locals
+	 '())
+    ;; Fill in wanted out registers
+    ,(if carry?
+	 (let ([lbl (random-label)])
+	   `(clc
+	     lda ,carry?
+	     beq ,lbl
+	     sec
+	     ,(label-decl lbl)))
+	 '())
+    ,(if a `(lda ,a) '())
+    ,(if x `(ldx ,x) '())
+    ,(if y `(ldy ,y) '())
+    pld					; Pop previous DP
+    rts))
+
+
+;; TODO: What about other addressing modes, like indirect, x indexed, etc?
+
+(define (local n)
+  `(dp ,n))
+
+(define (param locals n)
+  ;; n bytes into params, skip locals, skip saved DP, skip return address
+  `(dp ,(+ n locals 2 2)))
+
+(define (y-ind-param locals n)
+  ;; n bytes into params, skip locals, skip saved DP, skip return address
+  `(y-ind-dp ,(+ n locals 2 2)))
