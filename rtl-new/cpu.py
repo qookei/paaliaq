@@ -1,40 +1,75 @@
 from amaranth import *
-# from amaranth_soc.wishbone import *
+from amaranth.lib import wiring
+from amaranth.lib.wiring import In, Out
+from amaranth_soc import wishbone
 
-class CPUInterface(Elaboratable):
-    def __init__(self, bus_port):
-        # CPU's address pins
-        self.cpu_addr = Signal(16)
 
-        # CPU's data pins
-        self.cpu_data_i = Signal(8)
-        self.cpu_data_o = Signal(8)
-        self.cpu_data_oe = Signal()
+class W65C816BusSignature(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            # TODO(qookie): We probably should instead create a new
+            # ClockDomain?
+            'clk': In(1),
+            'rst': In(1),
+            # Address bus. (addr_hi is only valid during a part of the
+            # clock cycle, and might be the same as w_data)
+            'addr_lo': Out(16),
+            'addr_hi': Out(8),
+            # Data bus.
+            'r_data': In(8),
+            'r_data_en': In(1),
+            'w_data': Out(8),
+            # Bus control lines.
+            'rw': Out(1),
+            'vda': Out(1),
+            'vpa': Out(1),
+            'vpb': Out(1),
+            'mlb': Out(1),
+            # Other control lines.
+            'irq': In(1),
+            'nmi': In(1),
+            'abort': In(1),
+        })
 
-        # Misc CPU outputs
-        self.cpu_clk = Signal()
-        self.cpu_rwb = Signal()
-        self.cpu_vda = Signal()
-        self.cpu_vpa = Signal()
-        self.cpu_vp = Signal()
 
-        # Misc CPU inputs
-        self.cpu_abort = Signal()
-
-        self.bus_port = bus_port
-
-        # Internal signals
-
-        self.ctr = Signal(8)
-
-        self.cpu_addr_latch = Signal(24)
+class P65C816SoftCore(wiring.Component):
+    iface: Out(W65C816BusSignature())
 
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules += self.bus_port
+        m.submodules.cpu = Instance(
+            'P65C816',
+            ("i", "CLK", ~self.iface.clk),
+            ("i", "RST_N", self.iface.rst),
+            ("i", "CE", C(1)),
+            ("i", "RDY_IN", C(1)),
+            ("i", "NMI_N", self.iface.nmi),
+            ("i", "IRQ_N", self.iface.irq),
+            ("i", "ABORT_N", self.iface.abort),
+            ("i", "D_IN", self.iface.r_data),
+            ("o", "D_OUT", self.iface.w_data),
+            ("o", "A_OUT", Cat(self.iface.addr_lo, self.iface.addr_hi)),
+            ("o", "WE", self.iface.rw),
+            ("o", "VPA", self.iface.vpa),
+            ("o", "VDA", self.iface.vda),
+            ("o", "VPB", self.iface.vpb),
+            ("o", "MLB", self.iface.mlb),
+        )
 
-        m.d.comb += self.cpu_abort.eq(1)
+        return m
+
+
+class W65C816WishboneBridge(wiring.Component):
+    cpu: In(W65C816BusSignature())
+    wb_bus: Out(wishbone.Signature(addr_width=24, data_width=8))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.d.comb += self.cpu.nmi.eq(1)
+        m.d.comb += self.cpu.irq.eq(1)
+        m.d.comb += self.cpu.abort.eq(1)
 
         #     1   2  3       4    5         1
         #     |   |  |       |    |         |
@@ -66,7 +101,21 @@ class CPUInterface(Elaboratable):
         #  1 -> 3) tADS & tBAS: max 40 ns
         # 4? -> 5) tMDS: max 40 ns
 
-        m.d.sync += self.ctr.eq(self.ctr + 1)
+        half_freq = int(platform.default_clk_frequency // 64)
+        timer = Signal(range(half_freq + 1))
+
+        ctr = Signal(8)
+
+        with m.If(timer == half_freq):
+            m.d.sync += timer.eq(0)
+            m.d.sync += ctr.eq(ctr + 1)
+        with m.Else():
+            m.d.sync += timer.eq(timer + 1)
+        #m.d.sync += self.ctr.eq(self.ctr + 1)
+
+
+        addr_latch = Signal(24)
+
 
         # TODO: Replace uses of ctr with discrete states
 
@@ -79,68 +128,76 @@ class CPUInterface(Elaboratable):
         with m.FSM():
             with m.State('T1'):
                 m.d.sync += [
-                    self.cpu_clk.eq(0),
-                    self.ctr.eq(0)
+                    self.cpu.clk.eq(0),
+                    ctr.eq(0)
                 ]
                 m.next = 'T2'
             with m.State('T2'):
-                with m.If(self.ctr != CTR_T2_AT):
+                with m.If(ctr < CTR_T2_AT):
                     m.next = 'T2'
                 with m.Else():
-                    m.d.sync += self.cpu_data_oe.eq(0)
+                    m.d.sync += self.cpu.r_data_en.eq(0)
                     m.next = 'T3'
             with m.State('T3'):
-                with m.If(self.ctr != CTR_T3_AT):
+                with m.If(ctr < CTR_T3_AT):
                     m.next = 'T3'
                 with m.Else():
-                    m.d.sync += self.cpu_addr_latch.eq(
-                        (self.cpu_data_i << 16) | self.cpu_addr
+                    m.d.sync += addr_latch.eq(
+                        (self.cpu.addr_hi << 16) | self.cpu.addr_lo
                     )
                     m.next = 'T4'
             with m.State('T4'):
                 m.d.sync += [
-                    self.cpu_clk.eq(1),
-                    self.ctr.eq(0)
+                    self.cpu.clk.eq(1),
+                    ctr.eq(0)
                 ]
                 m.next = 'T5'
             with m.State('T5'):
-                with m.If(self.ctr != CTR_T5_AT):
+                with m.If(ctr < CTR_T5_AT):
                     m.next = 'T5'
                 with m.Else():
                     # XXX: Is this right?
                     m.d.sync += [
-                        self.bus_port.bus.adr.eq(self.cpu_addr_latch),
-                        self.bus_port.bus.cyc.eq(self.cpu_vda | self.cpu_vpa),
-                        # self.bus_port.bus.stb.eq(self.cpu_vda | self.cpu_vpa),
-                        self.bus_port.bus.we.eq(~self.cpu_rwb),
-                        self.bus_port.bus.dat_w.eq(self.cpu_data_i),
+                        self.wb_bus.adr.eq(addr_latch),
+                        self.wb_bus.cyc.eq(self.cpu.vda | self.cpu.vpa),
+                        self.wb_bus.stb.eq(self.cpu.vda | self.cpu.vpa),
+                        self.wb_bus.we.eq(~self.cpu.rw),
+                        self.wb_bus.dat_w.eq(self.cpu.w_data),
                     ]
                     m.next = 'T6'
             with m.State('T6'):
                 # Not in diagram above, here we wait until either the transaction completes
                 # (and set the data bus output for reads), or we wait for the minimum amount
                 # of cycles to pass.
-                with m.If(self.ctr != CTR_T6_AT):
+                m.d.sync += [
+                    self.cpu.rst.eq(1)
+                ]
+                m.next = 'T1'
+                with m.If(ctr < CTR_T6_AT):
                     m.next = 'T6'
-                with m.Elif(~self.bus_port.bus.cyc): # No-op cycle
+                with m.Elif(~self.wb_bus.cyc | ~self.cpu.rst): # No-op cycle
                     m.next = 'T1'
-                with m.Elif(self.bus_port.bus.ack): # Access complete
+                with m.Elif(self.wb_bus.ack): # Access complete
                     m.next = 'T1'
 
                     m.d.sync += [
-                        self.bus_port.bus.cyc.eq(0),
-                        self.bus_port.bus.stb.eq(0),
+                        self.wb_bus.cyc.eq(0),
+                        self.wb_bus.stb.eq(0),
                     ]
 
-                    with m.If(self.cpu_rwb): # XXX: One cycle may not be enough setup time
+                    with m.If(self.cpu.rw): # XXX: One cycle may not be enough setup time
                         m.d.sync += [
-                            self.cpu_data_o.eq(self.bus_port.bus.dat_r),
-                            self.cpu_data_oe.eq(1)
+                            self.cpu.r_data.eq(self.wb_bus.dat_r),
+                            self.cpu.r_data_en.eq(1)
                         ]
                 with m.Else():
                     # Access still in progress
                     # FIXME: Add a timeout? If no one responds to our bus transaction,
                     # we get stuck here...
-                    m.next = 'T6'
+
+                    # Bug amaranth-lang/amaranth-soc#38 talks about
+                    # making the Wishbone decoder assert ERR for
+                    # unmapped addresses...
+                    m.next = 'T1'
 
         return m

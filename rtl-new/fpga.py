@@ -29,17 +29,17 @@ class FpgaTopLevel(Elaboratable):
         m.d.sync += self.top.cpu.cpu_vpa.eq(platform.request('cpu_vpa', 0).i)
         m.d.sync += self.top.cpu.cpu_rwb.eq(platform.request('cpu_rwb', 0).i)
 
-        ram_data_pins = platform.request('ram_data', 0)
-        m.d.sync += [
-            ram_data_pins.oe.eq(self.top.extram.ram_data_oe),
-            ram_data_pins.o.eq(self.top.extram.ram_data_o),
-            self.top.extram.ram_data_i.eq(ram_data_pins.i)
-        ]
+        #ram_data_pins = platform.request('ram_data', 0)
+        #m.d.sync += [
+        #    ram_data_pins.oe.eq(self.top.extram.ram_data_oe),
+        #    ram_data_pins.o.eq(self.top.extram.ram_data_o),
+        #    self.top.extram.ram_data_i.eq(ram_data_pins.i)
+        #]
 
-        m.d.sync += platform.request('ram_addr', 0).o.eq(self.top.extram.ram_addr)
-        m.d.sync += platform.request('ram_cs', 0).o.eq(self.top.extram.ram_cs)
-        m.d.sync += platform.request('ram_we', 0).o.eq(self.top.extram.ram_we)
-        m.d.sync += platform.request('ram_oe', 0).o.eq(self.top.extram.ram_oe)
+        #m.d.sync += platform.request('ram_addr', 0).o.eq(self.top.extram.ram_addr)
+        #m.d.sync += platform.request('ram_cs', 0).o.eq(self.top.extram.ram_cs)
+        #m.d.sync += platform.request('ram_we', 0).o.eq(self.top.extram.ram_we)
+        #m.d.sync += platform.request('ram_oe', 0).o.eq(self.top.extram.ram_oe)
 
         return m
 

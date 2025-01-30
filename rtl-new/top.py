@@ -1,10 +1,11 @@
 from amaranth import *
 
-from amaranth_soc.wishbone import *
+from amaranth_soc import wishbone
+from amaranth_soc.wishbone.sram import *
 
-from cpu import CPUInterface
-from ram import RAM
-from extram import ExternalRAM
+from amaranth.lib import wiring
+
+from cpu import P65C816SoftCore, W65C816WishboneBridge
 
 def generate_boot_ram_contents():
     vector_table = [
@@ -41,36 +42,56 @@ def generate_boot_ram_contents():
         0x80, 0xFE        # 00FE0D   BRA -2
     ]
 
+    code = [
+                          # 00FE00 reset:
+        0xEA,             # 00FE00   NOP
+        0x1A,             # 00FE01   INC A
+        0x48,             # 00FE02   PHA
+        0x4C, 0x00, 0xFE  # 00FE03   JMP reset
+    ]
+
     return code + [0] * (0x200 - len(code) - len(vector_table)) + vector_table
+
+
 
 class TopLevel(Elaboratable):
     def __init__(self):
-        self.ram = RAM(generate_boot_ram_contents())
-        self.extram = ExternalRAM(21)
+        self.ram = WishboneSRAM(size=512, data_width=8, writable=False, init=generate_boot_ram_contents())
 
-        self.dec = Decoder(addr_width=24, data_width=8, granularity=8)
-        self.dec.add(self.ram.new_bus(), addr=0x00FE00)
-        self.dec.add(self.extram.new_bus(), addr=0x010000)
+        self.cpu = P65C816SoftCore()
+        self.cpu_bridge = W65C816WishboneBridge()
 
-        self.cpu = CPUInterface(self.dec)
+        self.dec = wishbone.Decoder(addr_width=24, data_width=8)
+        self.dec.add(self.ram.wb_bus, addr=0x00FE00)
+
 
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules += self.ram
-        m.submodules += self.extram
-        m.submodules += self.cpu
+        m.submodules.ram = self.ram
+        m.submodules.cpu = self.cpu
+        m.submodules.cpu_bridge = self.cpu_bridge
+        m.submodules.dec = self.dec
+
+        wiring.connect(m, self.cpu_bridge.cpu, self.cpu.iface)
+        wiring.connect(m, self.cpu_bridge.wb_bus, self.dec.bus)
 
         return m
+
+
+
+
 
 if __name__ == '__main__':
     from amaranth.back import verilog
 
+    # TODO(qookie): Fix this.
     with open("top.v", "w") as f:
         top = TopLevel()
         f.write(verilog.convert(top, ports=[
             # CPU connections
-            top.cpu.cpu_addr,
+            top.cpu.cpu_addr_lower,
+            top.cpu.cpu_addr_upper,
             top.cpu.cpu_data_i,
             top.cpu.cpu_data_o,
             top.cpu.cpu_data_oe,
@@ -81,11 +102,11 @@ if __name__ == '__main__':
             top.cpu.cpu_vp,
             top.cpu.cpu_abort,
             # External RAM connections
-            top.extram.ram_addr,
-            top.extram.ram_data_i,
-            top.extram.ram_data_o,
-            top.extram.ram_data_oe,
-            top.extram.ram_oe,
-            top.extram.ram_we,
-            top.extram.ram_cs,
+            #top.extram.ram_addr,
+            #top.extram.ram_data_i,
+            #top.extram.ram_data_o,
+            #top.extram.ram_data_oe,
+            #top.extram.ram_oe,
+            #top.extram.ram_we,
+            #top.extram.ram_cs,
         ]))
