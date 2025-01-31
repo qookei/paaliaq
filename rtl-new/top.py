@@ -30,39 +30,23 @@ def generate_boot_ram_contents():
 
     code = [
                           # 00FE00 reset:
-        0x18,             # 00FE00   CLC
-        0xFB,             # 00FE01   XCE
-        0xA2, 0x00, 0xFF, # 00FE02   LDX #$FF00
-        0x9A,             # 00FE05   TXS
-        0x02, 0xAA,       # 00FE06   COP #$AA
-
-                          # 00FE08 cop:
-        0xE2, 0x20,       # 00FE08   SEP #$20
-        0xEE, 0x00, 0xFE, # 00FE0A   INC $FE00
-        0x80, 0xFE        # 00FE0D   BRA -2
+        0xEE, 0xFF, 0xFE, # 00FE00   INC $FEFF
+        0x4C, 0x00, 0xFE, # 00FE03   JMP reset
     ]
 
-    code = [
-                          # 00FE00 reset:
-        0xEA,             # 00FE00   NOP
-        0x1A,             # 00FE01   INC A
-        0x48,             # 00FE02   PHA
-        0x4C, 0x00, 0xFE  # 00FE03   JMP reset
-    ]
-
-    return code + [0] * (0x200 - len(code) - len(vector_table)) + vector_table
+    return [0] * (0x10000 - 0x200) + code + [0] * (0x200 - len(code) - len(vector_table)) + vector_table
 
 
 
 class TopLevel(Elaboratable):
     def __init__(self):
-        self.ram = WishboneSRAM(size=512, data_width=8, writable=False, init=generate_boot_ram_contents())
+        self.ram = WishboneSRAM(size=0x10000, data_width=8, init=generate_boot_ram_contents())
 
         self.cpu = P65C816SoftCore()
         self.cpu_bridge = W65C816WishboneBridge()
 
         self.dec = wishbone.Decoder(addr_width=24, data_width=8)
-        self.dec.add(self.ram.wb_bus, addr=0x00FE00)
+        self.dec.add(self.ram.wb_bus, addr=0x000000)
 
 
     def elaborate(self, platform):
