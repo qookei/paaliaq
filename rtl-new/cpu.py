@@ -124,6 +124,8 @@ class W65C816WishboneBridge(wiring.Component):
 
         CTR_T5_AT = 4
         CTR_T6_AT = 8
+        # Since our data bus is only 8 bits wide, SEL_O is just always 1.
+        m.d.comb += self.wb_bus.sel.eq(1)
 
         with m.FSM():
             with m.State('T1'):
