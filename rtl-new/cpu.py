@@ -63,6 +63,7 @@ class P65C816SoftCore(wiring.Component):
 class W65C816WishboneBridge(wiring.Component):
     cpu: In(W65C816BusSignature())
     wb_bus: Out(wishbone.Signature(addr_width=24, data_width=8))
+    debug_trigger: Out(1)
 
     def elaborate(self, platform):
         m = Module()
@@ -188,6 +189,8 @@ class W65C816WishboneBridge(wiring.Component):
                 with m.If(~self.wb_bus.cyc | ~self.cpu.rst): # No-op cycle
                     m.d.sync += ctr.eq(0)
                     m.next = 'wait-high'
+
+                    m.d.sync += self.debug_trigger.eq(1)
                 with m.Elif(self.wb_bus.ack): # Access complete
                     m.d.sync += ctr.eq(0)
                     m.next = 'wait-high'
@@ -196,6 +199,7 @@ class W65C816WishboneBridge(wiring.Component):
                         self.wb_bus.cyc.eq(0),
                         self.wb_bus.stb.eq(0),
                     ]
+                    m.d.sync += self.debug_trigger.eq(1)
 
                     with m.If(self.cpu.rw):
                         m.d.sync += [
@@ -213,6 +217,7 @@ class W65C816WishboneBridge(wiring.Component):
                     pass
             with m.State('wait-high'):
                 # Wait for some time before taking the clock low.
+                m.d.sync += self.debug_trigger.eq(0)
                 with m.If(ctr == clks_wait_high):
                     m.next = 'clk-falling-edge'
 
