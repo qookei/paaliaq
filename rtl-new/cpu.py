@@ -119,11 +119,15 @@ class W65C816WishboneBridge(wiring.Component):
         clks_latch_addr = ns_to_cycles(tADS - tDHR)
         clks_w_data_valid = ns_to_cycles(tMDS)
         clks_wait_high = ns_to_cycles(tPWH - tMDS)
+        clks_rst_low = ns_to_cycles(tPWL)
+        clks_rst_high = ns_to_cycles(tPWH)
 
         max_clks = max(clks_hold_r_data,
                        clks_latch_addr,
                        clks_w_data_valid,
-                       clks_wait_high)
+                       clks_wait_high,
+                       clks_rst_low,
+                       clks_rst_high)
 
         ctr = Signal(range(max_clks + 1))
 
@@ -145,6 +149,21 @@ class W65C816WishboneBridge(wiring.Component):
         m.d.comb += self.wb_bus.sel.eq(1)
 
         with m.FSM():
+            with m.State('rst-clk-low'):
+                m.d.sync += [
+                    self.cpu.rst.eq(0),
+                    self.cpu.clk.eq(0),
+                ]
+                with m.If(ctr == clks_rst_low):
+                    m.next = 'rst-clk-high'
+                    m.d.sync += ctr.eq(0)
+            with m.State('rst-clk-high'):
+                m.d.sync += [
+                    self.cpu.clk.eq(1),
+                ]
+                with m.If(ctr == clks_rst_high):
+                    m.next = 'clk-falling-edge'
+                    m.d.sync += self.cpu.rst.eq(1)
             with m.State('clk-falling-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(0),
@@ -181,12 +200,7 @@ class W65C816WishboneBridge(wiring.Component):
                     ]
                     m.next = 'complete-transaction'
             with m.State('complete-transaction'):
-                # TODO(qookie): Separate states for resetting?
-                m.d.sync += [
-                    self.cpu.rst.eq(1)
-                ]
-
-                with m.If(~self.wb_bus.cyc | ~self.cpu.rst): # No-op cycle
+                with m.If(~self.wb_bus.cyc): # No-op cycle
                     m.d.sync += ctr.eq(0)
                     m.next = 'wait-high'
 
