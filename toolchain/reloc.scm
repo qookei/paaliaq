@@ -63,7 +63,10 @@
 		     source-bank target-bank symbol-name))
 	 (bytevector-uint-set! (elf-scn-data scn)
 			       (elf-reloc-offset reloc)
-			       target 'little len)]
+			       (logand target (if (eq? len 2)
+						  #xFFFF
+						  #xFFFFFF))
+			       'little len)]
 	[(eq? type R_W65C816_BANK)
 	 (bytevector-u8-set! (elf-scn-data scn)
 			     (elf-reloc-offset reloc)
