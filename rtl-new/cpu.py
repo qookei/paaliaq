@@ -101,63 +101,74 @@ class W65C816WishboneBridge(wiring.Component):
         #  1 -> 3) tADS & tBAS: max 40 ns
         # 4? -> 5) tMDS: max 40 ns
 
-        half_freq = int(platform.default_clk_frequency // 64)
-        timer = Signal(range(half_freq + 1))
+        # Times in nanoseconds
+        tDHR = 10 # From falling edge, read hold time
+        tADS = 40 # From falling edge to when full address is available
+        tMDS = 40 # From rising edge to when data bus has write data
 
-        ctr = Signal(8)
+        tPWL = 63 # Min time for clock to be low
+        tPWH = 63 # Min time for clock to be high
 
-        with m.If(timer == half_freq):
-            m.d.sync += timer.eq(0)
+        assert tDHR + tADS <= tPWL, "Min clock low time too short"
+
+        def ns_to_cycles(ns):
+            return (ns * platform.default_clk_frequency) // 1000000000
+
+        clks_hold_r_data = ns_to_cycles(tDHR)
+        clks_latch_addr = ns_to_cycles(tADS - tDHR)
+        clks_w_data_valid = ns_to_cycles(tMDS)
+        clks_wait_high = ns_to_cycles(tPWH - tMDS)
+
+        max_clks = max(clks_hold_r_data,
+                       clks_latch_addr,
+                       clks_w_data_valid,
+                       clks_wait_high)
+
+        ctr = Signal(range(max_clks + 1))
+
+        if True:
+            delay_clks = int(platform.default_clk_frequency // 16)
+            delay_timer = Signal(range(delay_clks + 1))
+
+            with m.If(delay_timer == delay_clks):
+                m.d.sync += delay_timer.eq(0)
+                m.d.sync += ctr.eq(ctr + 1)
+            with m.Else():
+                m.d.sync += delay_timer.eq(delay_timer + 1)
+        else:
             m.d.sync += ctr.eq(ctr + 1)
-        with m.Else():
-            m.d.sync += timer.eq(timer + 1)
-        #m.d.sync += self.ctr.eq(self.ctr + 1)
-
 
         addr_latch = Signal(24)
 
-
-        # TODO: Replace uses of ctr with discrete states
-
-        CTR_T2_AT = 2
-        CTR_T3_AT = 6
-
-        CTR_T5_AT = 4
-        CTR_T6_AT = 8
         # Since our data bus is only 8 bits wide, SEL_O is just always 1.
         m.d.comb += self.wb_bus.sel.eq(1)
 
         with m.FSM():
-            with m.State('T1'):
+            with m.State('clk-falling-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(0),
                     ctr.eq(0)
                 ]
-                m.next = 'T2'
-            with m.State('T2'):
-                with m.If(ctr < CTR_T2_AT):
-                    m.next = 'T2'
-                with m.Else():
-                    m.d.sync += self.cpu.r_data_en.eq(0)
-                    m.next = 'T3'
-            with m.State('T3'):
-                with m.If(ctr < CTR_T3_AT):
-                    m.next = 'T3'
-                with m.Else():
-                    m.d.sync += addr_latch.eq(
-                        (self.cpu.addr_hi << 16) | self.cpu.addr_lo
-                    )
-                    m.next = 'T4'
-            with m.State('T4'):
+                m.next = 'clear-r_data_en'
+            with m.State('clear-r_data_en'):
+                with m.If(ctr == clks_hold_r_data):
+                    m.d.sync += [
+                        self.cpu.r_data_en.eq(0),
+                        ctr.eq(0)
+                    ]
+                    m.next = 'latch-address'
+            with m.State('latch-address'):
+                with m.If(ctr == clks_latch_addr):
+                    m.d.sync += addr_latch.eq(Cat(self.cpu.addr_lo, self.cpu.addr_hi))
+                    m.next = 'clk-rising-edge'
+            with m.State('clk-rising-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(1),
                     ctr.eq(0)
                 ]
-                m.next = 'T5'
-            with m.State('T5'):
-                with m.If(ctr < CTR_T5_AT):
-                    m.next = 'T5'
-                with m.Else():
+                m.next = 'initiate-transaction'
+            with m.State('initiate-transaction'):
+                with m.If(ctr == clks_w_data_valid):
                     # XXX: Is this right?
                     m.d.sync += [
                         self.wb_bus.adr.eq(addr_latch),
@@ -165,29 +176,28 @@ class W65C816WishboneBridge(wiring.Component):
                         self.wb_bus.stb.eq(self.cpu.vda | self.cpu.vpa),
                         self.wb_bus.we.eq(~self.cpu.rw),
                         self.wb_bus.dat_w.eq(self.cpu.w_data),
+                        ctr.eq(0)
                     ]
-                    m.next = 'T6'
-            with m.State('T6'):
-                # Not in diagram above, here we wait until either the transaction completes
-                # (and set the data bus output for reads), or we wait for the minimum amount
-                # of cycles to pass.
+                    m.next = 'complete-transaction'
+            with m.State('complete-transaction'):
+                # TODO(qookie): Separate states for resetting?
                 m.d.sync += [
                     self.cpu.rst.eq(1)
                 ]
-                m.next = 'T1'
-                with m.If(ctr < CTR_T6_AT):
-                    m.next = 'T6'
-                with m.Elif(~self.wb_bus.cyc | ~self.cpu.rst): # No-op cycle
-                    m.next = 'T1'
+
+                with m.If(~self.wb_bus.cyc | ~self.cpu.rst): # No-op cycle
+                    m.d.sync += ctr.eq(0)
+                    m.next = 'wait-high'
                 with m.Elif(self.wb_bus.ack): # Access complete
-                    m.next = 'T1'
+                    m.d.sync += ctr.eq(0)
+                    m.next = 'wait-high'
 
                     m.d.sync += [
                         self.wb_bus.cyc.eq(0),
                         self.wb_bus.stb.eq(0),
                     ]
 
-                    with m.If(self.cpu.rw): # XXX: One cycle may not be enough setup time
+                    with m.If(self.cpu.rw):
                         m.d.sync += [
                             self.cpu.r_data.eq(self.wb_bus.dat_r),
                             self.cpu.r_data_en.eq(1)
@@ -200,6 +210,10 @@ class W65C816WishboneBridge(wiring.Component):
                     # Bug amaranth-lang/amaranth-soc#38 talks about
                     # making the Wishbone decoder assert ERR for
                     # unmapped addresses...
-                    m.next = 'T1'
+                    pass
+            with m.State('wait-high'):
+                # Wait for some time before taking the clock low.
+                with m.If(ctr == clks_wait_high):
+                    m.next = 'clk-falling-edge'
 
         return m
