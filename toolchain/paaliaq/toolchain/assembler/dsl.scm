@@ -33,7 +33,8 @@
 
 	    local
 	    param
-	    y-ind-param))
+	    y-ind-param
+	    y-ind-far-param))
 
 
 (define (%data-size body)
@@ -204,3 +205,7 @@
 (define (y-ind-param locals n)
   ;; n bytes into params, skip locals, skip saved DP, skip return address
   `(y-ind-dp ,(+ n locals 2 2)))
+
+(define (y-ind-far-param locals n)
+  ;; n bytes into params, skip locals, skip saved DP, skip return address
+  `(y-ind-far-dp ,(+ n locals 2 2)))
