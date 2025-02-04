@@ -7,6 +7,12 @@ from amaranth.lib import wiring
 
 from cpu import P65C816SoftCore, W65C816WishboneBridge
 
+
+from uart import UARTPeripheral
+
+from amaranth_soc import csr
+from amaranth_soc.csr.wishbone import WishboneCSRBridge
+
 def generate_boot_ram_contents():
     vector_table = [
         0x00, 0x00, # 0x00FFE0 (resv.)
@@ -45,8 +51,12 @@ class TopLevel(Elaboratable):
         self.cpu = P65C816SoftCore()
         self.cpu_bridge = W65C816WishboneBridge()
 
+        self.uart = UARTPeripheral()
+        self.csr_wb = WishboneCSRBridge(self.uart.bus)
+
         self.dec = wishbone.Decoder(addr_width=24, data_width=8)
         self.dec.add(self.ram.wb_bus, addr=0x000000)
+        self.dec.add(self.csr_wb.wb_bus, addr=0x010000)
 
 
     def elaborate(self, platform):
@@ -56,6 +66,8 @@ class TopLevel(Elaboratable):
         m.submodules.cpu = self.cpu
         m.submodules.cpu_bridge = self.cpu_bridge
         m.submodules.dec = self.dec
+        m.submodules.uart = self.uart
+        m.submodules.csr_wb = self.csr_wb
 
         wiring.connect(m, self.cpu_bridge.cpu, self.cpu.iface)
         wiring.connect(m, self.cpu_bridge.wb_bus, self.dec.bus)
