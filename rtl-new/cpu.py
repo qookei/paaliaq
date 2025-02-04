@@ -118,7 +118,7 @@ class W65C816WishboneBridge(wiring.Component):
         clks_hold_r_data = ns_to_cycles(tDHR)
         clks_latch_addr = ns_to_cycles(tADS - tDHR)
         clks_w_data_valid = ns_to_cycles(tMDS)
-        clks_wait_high = ns_to_cycles(tPWH - tMDS)
+        clks_wait_high = 1 + ns_to_cycles(tPWH - tMDS)
         clks_rst_low = ns_to_cycles(tPWL)
         clks_rst_high = ns_to_cycles(tPWH)
 

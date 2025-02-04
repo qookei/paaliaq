@@ -61,36 +61,3 @@ class TopLevel(Elaboratable):
         wiring.connect(m, self.cpu_bridge.wb_bus, self.dec.bus)
 
         return m
-
-
-
-
-
-if __name__ == '__main__':
-    from amaranth.back import verilog
-
-    # TODO(qookie): Fix this.
-    with open("top.v", "w") as f:
-        top = TopLevel()
-        f.write(verilog.convert(top, ports=[
-            # CPU connections
-            top.cpu.cpu_addr_lower,
-            top.cpu.cpu_addr_upper,
-            top.cpu.cpu_data_i,
-            top.cpu.cpu_data_o,
-            top.cpu.cpu_data_oe,
-            top.cpu.cpu_clk,
-            top.cpu.cpu_rwb,
-            top.cpu.cpu_vda,
-            top.cpu.cpu_vpa,
-            top.cpu.cpu_vp,
-            top.cpu.cpu_abort,
-            # External RAM connections
-            #top.extram.ram_addr,
-            #top.extram.ram_data_i,
-            #top.extram.ram_data_o,
-            #top.extram.ram_data_oe,
-            #top.extram.ram_oe,
-            #top.extram.ram_we,
-            #top.extram.ram_cs,
-        ]))
