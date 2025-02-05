@@ -15,7 +15,8 @@ class SimTopLevel(wiring.Component):
         m.submodules.top = top = TopLevel()
 
         m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
-        m.d.comb += self.tx.eq(probe.tx)
+        #m.d.comb += self.tx.eq(probe.tx)
+        m.d.comb += self.tx.eq(top.uart.tx)
 
         return m
 

@@ -118,7 +118,7 @@ class W65C816WishboneBridge(wiring.Component):
         clks_hold_r_data = ns_to_cycles(tDHR)
         clks_latch_addr = ns_to_cycles(tADS - tDHR)
         clks_w_data_valid = ns_to_cycles(tMDS)
-        clks_wait_high = 1 + ns_to_cycles(tPWH - tMDS)
+        clks_wait_high = ns_to_cycles(tPWH - tMDS)
         clks_rst_low = ns_to_cycles(tPWL)
         clks_rst_high = ns_to_cycles(tPWH)
 
@@ -131,8 +131,8 @@ class W65C816WishboneBridge(wiring.Component):
 
         ctr = Signal(range(max_clks + 1))
 
-        if True:
-            delay_clks = int(platform.default_clk_frequency // 16)
+        if False:
+            delay_clks = int(platform.default_clk_frequency // 256)
             delay_timer = Signal(range(delay_clks + 1))
 
             with m.If(delay_timer == delay_clks):

@@ -14,10 +14,14 @@ class FpgaTopLevel(Elaboratable):
 
         m.submodules.top = top = TopLevel()
 
-        if True:
+        if False:
             m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
             uart = platform.request("uart")
             m.d.comb += uart.tx.o.eq(probe.tx)
+        else:
+            uart = platform.request("uart")
+            m.d.comb += uart.tx.o.eq(top.uart.tx)
+
 
         led = platform.request("led")
         m.d.comb += led.o.eq(1)
