@@ -35,9 +35,16 @@ def generate_boot_ram_contents():
     ]
 
     code = [
-                          # 00FE00 reset:
-        0xEE, 0xFF, 0xFE, # 00FE00   INC $FEFF
-        0x4C, 0x00, 0xFE, # 00FE03   JMP reset
+                                # 00FE00 reset:
+        0x18,                   # 00FE00   CLC
+        0xFB,                   # 00FE01   XCE
+        0xF4, 0x01, 0x01,       # 00FE02   PEA $0101
+        0xAB, 0xAB,             # 00FE05   PLB : PLB
+        0x2C, 0x01, 0x00,       # 00FE07   BIT $0001      UART_STATUS
+        0x10, 0xFB,             # 00FE0A   BPL $FE07      bit 7 clear? (TX_FIFO_NOT_FULL)
+        0x1A,                   # 00FE0C   INA
+        0x8D, 0x02, 0x00,       # 00FE0D   STA $0002      TX_DATA
+        0x4C, 0x07, 0xFE,       # 00FE0C   JMP $FE07
     ]
 
     return [0] * (0x10000 - 0x200) + code + [0] * (0x200 - len(code) - len(vector_table)) + vector_table
