@@ -89,9 +89,9 @@ class UARTPeripheral(wiring.Component):
         _unused: csr.Field(csr.action.ResR0WA, 8)
 
     class StatusRegister(csr.Register, access="r"):
-        tx_not_full:  csr.Field(csr.action.R, 1)
-        rx_not_empty: csr.Field(csr.action.R, 1)
         _unused: csr.Field(csr.action.ResR0WA, 6)
+        rx_not_empty: csr.Field(csr.action.R, 1)
+        tx_not_full:  csr.Field(csr.action.R, 1)
 
 
     class TxDataRegister(csr.Register, access="w"):
