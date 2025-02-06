@@ -1,7 +1,7 @@
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
-from amaranth_soc import wishbone
+from amaranth_soc import wishbone, event
 
 
 class W65C816BusSignature(wiring.Signature):
@@ -64,12 +64,13 @@ class W65C816WishboneBridge(wiring.Component):
     cpu: In(W65C816BusSignature())
     wb_bus: Out(wishbone.Signature(addr_width=24, data_width=8))
     debug_trigger: Out(1)
+    irq: In(event.Source().signature)
 
     def elaborate(self, platform):
         m = Module()
 
         m.d.comb += self.cpu.nmi.eq(1)
-        m.d.comb += self.cpu.irq.eq(1)
+        m.d.comb += self.cpu.irq.eq(~self.irq.i)
         m.d.comb += self.cpu.abort.eq(1)
 
         #     1   2  3       4    5         1

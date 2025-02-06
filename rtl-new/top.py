@@ -1,6 +1,6 @@
 from amaranth import *
 
-from amaranth_soc import wishbone
+from amaranth_soc import wishbone, event
 from amaranth_soc.wishbone.sram import *
 
 from amaranth.lib import wiring
@@ -12,6 +12,7 @@ from uart import UARTPeripheral
 
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
+from amaranth_soc.csr.event import EventMonitor
 
 def generate_boot_ram_contents():
     vector_table = [
@@ -52,7 +53,7 @@ def generate_boot_ram_contents():
 
 class SystemTimer(wiring.Component):
     bus: wiring.In(csr.Signature(addr_width=4, data_width=8))
-    irq: wiring.Out(1)
+    irq: wiring.Out(event.Source().signature)
 
     class ConfigRegister(csr.Register, access="rw"):
         irq_en: csr.Field(csr.action.RW, 1)
@@ -99,9 +100,9 @@ class SystemTimer(wiring.Component):
             m.d.sync += ctr.eq(ctr + 1)
 
         with m.If(self._config.f.irq_en.data & (time >= self._deadline.f.deadline.data)):
-            m.d.sync += self.irq.eq(1)
+            m.d.sync += self.irq.i.eq(1)
         with m.Else():
-            m.d.sync += self.irq.eq(0)
+            m.d.sync += self.irq.i.eq(0)
 
         m.d.comb += [
             self._time.f.time.r_data.eq(time),
@@ -112,10 +113,7 @@ class SystemTimer(wiring.Component):
 
 class TopLevel(Elaboratable):
     def __init__(self):
-        self.ram = WishboneSRAM(size=0x10000, data_width=8, init=generate_boot_ram_contents())
-
-        self.cpu = P65C816SoftCore()
-        self.cpu_bridge = W65C816WishboneBridge()
+        self.ram = WishboneSRAM(size=0x10000, data_width=8, init=generate_boot_ram_contents('../toolchain/boot.bin'))
 
         self.timer = SystemTimer()
         self.uart = UARTPeripheral()
@@ -124,11 +122,23 @@ class TopLevel(Elaboratable):
         self.csr_dec.add(self.uart.bus, name="uart")
         self.csr_dec.add(self.timer.bus, name="timer")
 
+        evt_map = event.EventMap()
+        evt_map.add(self.timer.irq)
+
+        self.monitor = EventMonitor(evt_map, data_width=8)
+        self.csr_dec.add(self.monitor.bus, name="intc")
+
         self.csr_wb = WishboneCSRBridge(self.csr_dec.bus)
 
         self.dec = wishbone.Decoder(addr_width=24, data_width=8)
         self.dec.add(self.ram.wb_bus, addr=0x000000)
         self.dec.add(self.csr_wb.wb_bus, addr=0x010000)
+
+
+        self.cpu = P65C816SoftCore()
+        self.cpu_bridge = W65C816WishboneBridge()
+
+
 
 
     def elaborate(self, platform):
@@ -142,7 +152,9 @@ class TopLevel(Elaboratable):
         m.submodules.uart = self.uart
         m.submodules.csr_dec = self.csr_dec
         m.submodules.csr_wb = self.csr_wb
+        m.submodules.monitor = self.monitor
 
+        wiring.connect(m, self.cpu_bridge.irq, self.monitor.src)
         wiring.connect(m, self.cpu_bridge.cpu, self.cpu.iface)
         wiring.connect(m, self.cpu_bridge.wb_bus, self.dec.bus)
 

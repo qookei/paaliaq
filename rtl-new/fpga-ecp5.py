@@ -24,7 +24,7 @@ class FpgaTopLevel(Elaboratable):
 
 
         led = platform.request("led")
-        m.d.comb += led.o.eq(1)
+        m.d.comb += led.o.eq(top.timer.irq.i)
 
         return m
 
