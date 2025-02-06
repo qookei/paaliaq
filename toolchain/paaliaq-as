@@ -8,7 +8,7 @@ SCRIPTDIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 # that much code, and the user can precompile all of the toolchain
 # sources using `guild compile'.
 
-exec ${GUILE:-guile} \
+exec ${GUILE:-guile-3.0} \
      --no-auto-compile \
      -L "${SCRIPTDIR}" \
      -e main \

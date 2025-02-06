@@ -92,7 +92,6 @@
 	(error "TODO: support more than one section"))
     (pretty-print symbol-table)
     (pretty-print out-elf)
-    (pretty-print (bytevector-u8-ref (elf-scn-data out-elf) 68))
     (call-with-output-file out-name
       (λ (port)
 	(emit-elf-object port
