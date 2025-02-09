@@ -18,10 +18,13 @@ class FpgaTopLevel(Elaboratable):
             m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
             uart = platform.request("uart")
             m.d.comb += uart.tx.o.eq(probe.tx)
+            m.d.comb += top.uart.rx.eq(1)
         else:
             uart = platform.request("uart")
-            m.d.comb += uart.tx.o.eq(top.uart.tx)
-
+            m.d.comb += [
+                uart.tx.o.eq(top.uart.tx),
+                top.uart.rx.eq(uart.rx.i),
+            ]
 
         led = platform.request("led")
         m.d.comb += led.o.eq(top.timer.irq.i)
@@ -45,7 +48,7 @@ class PaaliaqPlatform(LatticeECP5Platform):
         *ButtonResources(pins="R7", invert=True,
                          attrs=Attrs(IO_TYPE="LVCMOS33", PULLMODE="UP")),
 
-        UARTResource(0, rx="T14", tx="T13"),
+        UARTResource(0, rx="R7", tx="T13"),
     ]
 
     connectors = []
