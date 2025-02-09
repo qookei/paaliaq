@@ -134,6 +134,7 @@ class UARTReceiver(wiring.Component):
                     with m.If(~self.rx):
                         m.next = 'data'
                     with m.Else():
+                        m.d.sync += rx_cke.eq(0)
                         m.next = 'idle'
 
             with m.State('data'):
@@ -149,6 +150,7 @@ class UARTReceiver(wiring.Component):
             with m.State('stop'):
                 m.d.sync += self._rx_fifo.w_en.eq(0)
                 with m.If(rx_stb):
+                    m.d.sync += rx_cke.eq(0)
                     m.next = 'stop->idle'
 
             with m.State('stop->idle'):
