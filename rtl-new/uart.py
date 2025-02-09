@@ -72,10 +72,7 @@ class UARTTransmitter(wiring.Component):
             with m.State('stop'):
                 m.d.sync += self.tx.eq(1)
                 with m.If(tx_stb):
-                    m.next = 'stop->idle'
-
-            with m.State('stop->idle'):
-                m.next = 'idle'
+                    m.next = 'idle'
 
         return m
 
@@ -151,10 +148,7 @@ class UARTReceiver(wiring.Component):
                 m.d.sync += self._rx_fifo.w_en.eq(0)
                 with m.If(rx_stb):
                     m.d.sync += rx_cke.eq(0)
-                    m.next = 'stop->idle'
-
-            with m.State('stop->idle'):
-                m.next = 'idle'
+                    m.next = 'idle'
 
         return m
 
