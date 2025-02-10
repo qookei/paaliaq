@@ -64,6 +64,7 @@ class W65C816DebugProbe(wiring.Component):
         vpa = Signal()
         rwb = Signal()
         vpb = Signal()
+        abort = Signal()
 
         with m.FSM():
             with m.State('idle'):
@@ -94,6 +95,7 @@ class W65C816DebugProbe(wiring.Component):
                         vpa.eq(self.cpu_bridge.cpu.vpa),
                         rwb.eq(self.cpu_bridge.cpu.rw),
                         vpb.eq(self.cpu_bridge.cpu.vpb),
+                        abort.eq(self.cpu_bridge.cpu.abort),
                     ]
 
                     m.next = 'tx-0'
@@ -125,9 +127,11 @@ class W65C816DebugProbe(wiring.Component):
             emit_char(18, Mux(vpa, C(ord('P'), 8), C(ord('-'), 8)))
             emit_char(19, Mux(rwb, C(ord('R'), 8), C(ord('W'), 8)))
             emit_char(20, Mux(vpb, C(ord('-'), 8), C(ord('V'), 8)))
-            emit_char(21, C(ord('\n'), 8))
+            emit_char(21, Mux(abort, C(ord('-'), 8), C(ord('A'), 8)))
+            emit_char(22, C(ord('\r'), 8))
+            emit_char(23, C(ord('\n'), 8))
 
-            with m.State('tx-22'):
+            with m.State('tx-24'):
                 m.next = 'idle'
 
         return m
