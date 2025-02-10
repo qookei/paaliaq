@@ -61,9 +61,6 @@ class MMU(wiring.Component):
         self._fault_reason = regs.add('FaultReason', self.FaultReasonRegister())
         self._pt_index = regs.add('PtIndex', self.PtIndexRegister())
         self._pt_write = regs.add('PtWrite', self.PtWriteRegister())
-        #self._status = regs.add("Status", self.StatusRegister())
-        #self._tx_data = regs.add("TxData", self.TxDataRegister())
-        #self._rx_data = regs.add("RxData", self.RxDataRegister())
 
         mmap = regs.as_memory_map()
         print(list(mmap.resources()))
@@ -116,15 +113,15 @@ class MMU(wiring.Component):
         with m.If(self._pt_index.f.index.w_stb):
             m.d.sync += index.eq(self._pt_index.f.index.w_data)
 
-        m.d.comb += [
-            wr_port.data.eq(self._pt_write.f.entry.w_data),
-            wr_port.en.eq(self._pt_write.f.entry.w_stb),
-        ]
+        m.d.comb += wr_port.data.eq(self._pt_write.f.entry.w_data)
 
         with m.If(self._pt_write.f.entry.w_stb):
             m.d.sync += [
+                wr_port.en.eq(1),
                 wr_port.addr.eq(index),
                 index.eq(index + 1),
             ]
+        with m.Else():
+            m.d.sync += wr_port.en.eq(0)
 
         return m
