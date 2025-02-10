@@ -148,7 +148,7 @@ class W65C816WishboneBridge(wiring.Component):
         else:
             m.d.sync += ctr.eq(ctr + 1)
 
-        m.d.comb += self.cpu.nmi.eq(1)
+        m.d.comb += self.cpu.nmi.eq(~mmu.iface.abort)
         m.d.comb += self.cpu.irq.eq(~self.irq.i)
         m.d.comb += self.cpu.abort.eq(~mmu.iface.abort)
 
