@@ -3,6 +3,7 @@ from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import wishbone, event
 
+from mmu import MMUSignature, MMU
 
 class W65C816BusSignature(wiring.Signature):
     def __init__(self):
@@ -66,12 +67,15 @@ class W65C816WishboneBridge(wiring.Component):
     debug_trigger: Out(1)
     irq: In(event.Source().signature)
 
+    def __init__(self):
+        super().__init__()
+
+        self.mmu = MMU()
+
     def elaborate(self, platform):
         m = Module()
 
-        m.d.comb += self.cpu.nmi.eq(1)
-        m.d.comb += self.cpu.irq.eq(~self.irq.i)
-        m.d.comb += self.cpu.abort.eq(1)
+        m.submodules.mmu = mmu = self.mmu
 
         #     1   2  3       4    5         1
         #     |   |  |       |    |         |
@@ -144,10 +148,18 @@ class W65C816WishboneBridge(wiring.Component):
         else:
             m.d.sync += ctr.eq(ctr + 1)
 
-        addr_latch = Signal(24)
+        m.d.comb += self.cpu.nmi.eq(1)
+        m.d.comb += self.cpu.irq.eq(~self.irq.i)
+        m.d.comb += self.cpu.abort.eq(~mmu.iface.abort)
+
+        # TODO(qookie):
+        m.d.comb += mmu.iface.user.eq(0)
 
         # Since our data bus is only 8 bits wide, SEL_O is just always 1.
         m.d.comb += self.wb_bus.sel.eq(1)
+        # Since we only perform one bus cycle per CPU cycle, CYC_O and
+        # STB_O are always the same.
+        m.d.comb += self.wb_bus.stb.eq(self.wb_bus.cyc)
 
         with m.FSM():
             with m.State('rst-clk-low'):
@@ -180,8 +192,18 @@ class W65C816WishboneBridge(wiring.Component):
                     m.next = 'latch-address'
             with m.State('latch-address'):
                 with m.If(ctr == clks_latch_addr):
-                    m.d.sync += addr_latch.eq(Cat(self.cpu.addr_lo, self.cpu.addr_hi))
-                    m.next = 'clk-rising-edge'
+                    m.d.sync += [
+                        mmu.iface.vaddr.eq(Cat(self.cpu.addr_lo, self.cpu.addr_hi)),
+                        mmu.iface.write.eq(~self.cpu.rw),
+                        mmu.iface.ifetch.eq(self.cpu.vpa),
+                    ]
+                    m.next = 'mmu-stb-hi'
+            with m.State('mmu-stb-hi'):
+                m.d.sync += mmu.iface.stb.eq(self.cpu.vda | self.cpu.vpa)
+                m.next = 'mmu-stb-lo'
+            with m.State('mmu-stb-lo'):
+                m.d.sync += mmu.iface.stb.eq(0)
+                m.next = 'clk-rising-edge'
             with m.State('clk-rising-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(1),
@@ -192,9 +214,8 @@ class W65C816WishboneBridge(wiring.Component):
                 with m.If(ctr == clks_w_data_valid):
                     # XXX: Is this right?
                     m.d.sync += [
-                        self.wb_bus.adr.eq(addr_latch),
-                        self.wb_bus.cyc.eq(self.cpu.vda | self.cpu.vpa),
-                        self.wb_bus.stb.eq(self.cpu.vda | self.cpu.vpa),
+                        self.wb_bus.adr.eq(mmu.iface.paddr),
+                        self.wb_bus.cyc.eq((self.cpu.vda | self.cpu.vpa) & self.cpu.abort),
                         self.wb_bus.we.eq(~self.cpu.rw),
                         self.wb_bus.dat_w.eq(self.cpu.w_data),
                         ctr.eq(0)
@@ -210,10 +231,7 @@ class W65C816WishboneBridge(wiring.Component):
                     m.d.sync += ctr.eq(0)
                     m.next = 'wait-high'
 
-                    m.d.sync += [
-                        self.wb_bus.cyc.eq(0),
-                        self.wb_bus.stb.eq(0),
-                    ]
+                    m.d.sync += self.wb_bus.cyc.eq(0)
                     m.d.sync += self.debug_trigger.eq(1)
 
                     with m.If(self.cpu.rw):

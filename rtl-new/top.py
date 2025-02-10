@@ -113,6 +113,9 @@ class SystemTimer(wiring.Component):
 
 class TopLevel(Elaboratable):
     def __init__(self):
+        self.cpu = P65C816SoftCore()
+        self.cpu_bridge = W65C816WishboneBridge()
+
         self.ram = WishboneSRAM(size=0x10000, data_width=8, init=generate_boot_ram_contents('../toolchain/boot.bin'))
 
         self.timer = SystemTimer()
@@ -128,15 +131,13 @@ class TopLevel(Elaboratable):
         self.monitor = EventMonitor(evt_map, data_width=8)
         self.csr_dec.add(self.monitor.bus, name="intc")
 
+        self.csr_dec.add(self.cpu_bridge.mmu.bus, name="mmu")
         self.csr_wb = WishboneCSRBridge(self.csr_dec.bus)
 
         self.dec = wishbone.Decoder(addr_width=24, data_width=8)
         self.dec.add(self.ram.wb_bus, addr=0x000000)
         self.dec.add(self.csr_wb.wb_bus, addr=0x010000)
 
-
-        self.cpu = P65C816SoftCore()
-        self.cpu_bridge = W65C816WishboneBridge()
 
 
 
