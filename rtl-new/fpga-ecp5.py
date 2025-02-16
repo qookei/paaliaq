@@ -12,6 +12,44 @@ class FpgaTopLevel(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        cd_sync = ClockDomain("sync")
+        m.domains += cd_sync
+
+        cd_sdram = ClockDomain("sdram")
+        m.domains += cd_sdram
+
+        primary_clk = Signal()
+
+        # TODO
+        # platform.add_clock_constraint(cd_sync.clk, 100e6)
+
+        m.submodules.pll = Instance(
+            "EHXPLLL",
+
+            a_FREQUENCY_PIN_CLKI="25",
+            a_FREQUENCY_PIN_CLKOP="75",
+            a_FREQUENCY_PIN_CLKOS="75",
+            a_ICP_CURRENT="12",
+            a_LPF_RESISTOR="8",
+            p_CLKI_DIV=1,
+            p_CLKOP_DIV=8,
+            p_CLKOS_DIV=8,
+            p_CLKOP_CPHASE=4,
+            p_CLKOP_FPHASE=0,
+            p_CLKOS_CPHASE=8,
+            p_CLKOS_FPHASE=0,
+            p_CLKFB_DIV=3,
+            p_FEEDBK_PATH="CLKOP",
+            p_CLKOP_ENABLE="ENABLED",
+            p_CLKOS_ENABLE="ENABLED",
+
+            i_CLKI=platform.request("clk25").i,
+
+            o_CLKOP=ClockSignal("sync"),
+            o_CLKOS=ClockSignal("sdram"),
+            i_CLKFB=ClockSignal("sync"),
+        )
+
         m.submodules.top = top = TopLevel()
 
         if False:
@@ -33,11 +71,11 @@ class FpgaTopLevel(Elaboratable):
 
 
 class PaaliaqPlatform(LatticeECP5Platform):
-    device                 = "LFE5U-25F"
-    package                = "BG256"
-    speed                  = "7"
-    default_clk            = "clk25"
-    default_clk_frequency  = 25000000
+    device               = "LFE5U-25F"
+    package              = "BG256"
+    speed                = "7"
+    default_clk          = "clk25"
+    target_clk_frequency = 75000000
 
     resources = [
         Resource("clk25", 0, Pins("P6", dir="i"), Clock(25e6), Attrs(IO_TYPE="LVCMOS33")),

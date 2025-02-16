@@ -23,7 +23,7 @@ class UARTTransmitter(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        clocks_per_bit = int(platform.default_clk_frequency // self.baudrate)
+        clocks_per_bit = int(platform.target_clk_frequency // self.baudrate)
 
         tx_timer = Signal(range(clocks_per_bit + 1))
         tx_sr = Signal(8)
@@ -94,7 +94,7 @@ class UARTReceiver(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        clocks_per_bit = int(platform.default_clk_frequency // self.baudrate)
+        clocks_per_bit = int(platform.target_clk_frequency // self.baudrate)
 
         rx_timer = Signal(range(clocks_per_bit + 1))
         rx_sr = Signal(8)

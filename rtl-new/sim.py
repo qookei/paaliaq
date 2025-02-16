@@ -25,7 +25,7 @@ if __name__ == '__main__':
     from amaranth.back import verilog
 
     class SimPlatform:
-        default_clk_frequency = 115200 * 10
+        target_clk_frequency = 115200 * 10
 
     with open("sim_top.v", "w") as f:
         top = SimTopLevel()

@@ -89,7 +89,7 @@ class SystemTimer(wiring.Component):
         time = Signal(32)
 
         rate = 1000 # Hz
-        clks_per_tick = platform.default_clk_frequency // rate
+        clks_per_tick = int(platform.target_clk_frequency / rate)
 
         ctr = Signal(range(clks_per_tick + 1))
 

@@ -118,7 +118,7 @@ class W65C816WishboneBridge(wiring.Component):
         assert tDHR + tADS <= tPWL, "Min clock low time too short"
 
         def ns_to_cycles(ns):
-            return (ns * platform.default_clk_frequency) // 1000000000
+            return int((ns * platform.target_clk_frequency) / 1000000000)
 
         clks_hold_r_data = ns_to_cycles(tDHR)
         clks_latch_addr = ns_to_cycles(tADS - tDHR)
@@ -137,7 +137,7 @@ class W65C816WishboneBridge(wiring.Component):
         ctr = Signal(range(max_clks + 1))
 
         if False:
-            delay_clks = int(platform.default_clk_frequency // 256)
+            delay_clks = int(platform.target_clk_frequency / 256)
             delay_timer = Signal(range(delay_clks + 1))
 
             with m.If(delay_timer == delay_clks):
