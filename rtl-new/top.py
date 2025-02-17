@@ -10,6 +10,8 @@ from cpu import P65C816SoftCore, W65C816WishboneBridge
 
 from uart import UARTPeripheral
 
+from sdram import SDRAMController
+
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
 from amaranth_soc.csr.event import EventMonitor
@@ -134,11 +136,12 @@ class TopLevel(Elaboratable):
         self.csr_dec.add(self.cpu_bridge.mmu.bus, name="mmu")
         self.csr_wb = WishboneCSRBridge(self.csr_dec.bus)
 
+        self.sdram_ctrl = SDRAMController()
+
         self.dec = wishbone.Decoder(addr_width=24, data_width=8)
         self.dec.add(self.ram.wb_bus, addr=0x000000)
         self.dec.add(self.csr_wb.wb_bus, addr=0x010000)
-
-
+        self.dec.add(self.sdram_ctrl.wb_bus, addr=0x200000)
 
 
 
@@ -154,6 +157,7 @@ class TopLevel(Elaboratable):
         m.submodules.csr_dec = self.csr_dec
         m.submodules.csr_wb = self.csr_wb
         m.submodules.monitor = self.monitor
+        m.submodules.sdram_ctrl = self.sdram_ctrl
 
         wiring.connect(m, self.cpu_bridge.irq, self.monitor.src)
         wiring.connect(m, self.cpu_bridge.cpu, self.cpu.iface)

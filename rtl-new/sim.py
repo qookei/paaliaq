@@ -4,10 +4,13 @@ from amaranth.lib.wiring import In, Out
 
 from top import TopLevel
 from probe import W65C816DebugProbe
+from sdram import SDRAMSignature
 
 
 class SimTopLevel(wiring.Component):
     tx: Out(1)
+    sdram: Out(SDRAMSignature())
+    sdram_clk: Out(1)
 
     def elaborate(self, platform):
         m = Module()
@@ -17,6 +20,19 @@ class SimTopLevel(wiring.Component):
         m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
         #m.d.comb += self.tx.eq(probe.tx)
         m.d.comb += self.tx.eq(top.uart.tx)
+        m.d.comb += top.uart.rx.eq(1)
+
+        m.d.comb += [
+            self.sdram.ba.eq(top.sdram_ctrl.sdram.ba),
+            self.sdram.a.eq(top.sdram_ctrl.sdram.a),
+            self.sdram.dq_o.eq(top.sdram_ctrl.sdram.dq_o),
+            top.sdram_ctrl.sdram.dq_i.eq(self.sdram.dq_i),
+            self.sdram.we.eq(~top.sdram_ctrl.sdram.we),
+            self.sdram.ras.eq(~top.sdram_ctrl.sdram.ras),
+            self.sdram.cas.eq(~top.sdram_ctrl.sdram.cas),
+            self.sdram_clk.eq(~ClockSignal("sync")),
+        ]
+
 
         return m
 
@@ -30,5 +46,13 @@ if __name__ == '__main__':
     with open("sim_top.v", "w") as f:
         top = SimTopLevel()
         f.write(verilog.convert(top, platform=SimPlatform(), ports=[
-            top.tx
+            top.tx,
+            top.sdram_clk,
+            top.sdram.ba,
+            top.sdram.a,
+            top.sdram.dq_i,
+            top.sdram.dq_o,
+            top.sdram.we,
+            top.sdram.ras,
+            top.sdram.cas,
         ]))
