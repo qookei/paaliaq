@@ -21,14 +21,14 @@ class SDRAMSignature(wiring.Signature):
 
 
 class SDRAMController(wiring.Component):
-    wb_bus: In(wishbone.Signature(addr_width=21, data_width=8))
+    wb_bus: In(wishbone.Signature(addr_width=23, data_width=8))
     sdram: Out(SDRAMSignature())
 
     def __init__(self):
         super().__init__()
 
-        self.wb_bus.memory_map = MemoryMap(addr_width=21, data_width=8)
-        self.wb_bus.memory_map.add_resource(self, name=("sdram",), size=(1<<21))
+        self.wb_bus.memory_map = MemoryMap(addr_width=23, data_width=8)
+        self.wb_bus.memory_map.add_resource(self, name=("sdram",), size=(1<<23))
         self.wb_bus.memory_map.freeze()
 
     def elaborate(self, platform):
@@ -163,9 +163,10 @@ class SDRAMController(wiring.Component):
         trans_ack = Signal()
         m.d.comb += self.wb_bus.ack.eq(trans_ack & self.wb_bus.stb)
 
-        column = self.wb_bus.adr.bit_select(0, 8)
-        row = self.wb_bus.adr.bit_select(8, 11)
-        bank = self.wb_bus.adr.bit_select(19, 2)
+        byte = self.wb_bus.adr.bit_select(0, 2)
+        column = self.wb_bus.adr.bit_select(2, 8)
+        row = self.wb_bus.adr.bit_select(10, 11)
+        bank = self.wb_bus.adr.bit_select(21, 2)
 
         with m.FSM():
             # Initialization states
@@ -217,22 +218,29 @@ class SDRAMController(wiring.Component):
                 m.d.sync += noop()
                 m.d.sync += activate_ctr.eq(activate_ctr + 1)
                 with m.If(activate_ctr == activate_clks):
+                    m.d.sync += read_ctr.eq(0)
+                    m.d.sync += read(bank, column)
                     with m.If(self.wb_bus.we):
-                        m.d.sync += write_ctr.eq(0)
-                        m.d.sync += write(bank, column, self.wb_bus.dat_w)
-                        m.next = 'write-data'
+                        m.next = 'read-before-write-data'
                     with m.Else():
-                        m.d.sync += read_ctr.eq(0)
-                        m.d.sync += read(bank, column)
                         m.next = 'read-data'
             with m.State('read-data'):
                 m.d.sync += noop()
                 m.d.sync += read_ctr.eq(read_ctr + 1)
                 with m.If(read_ctr == cas_clks):
-                    m.d.sync += self.wb_bus.dat_r.eq(self.sdram.dq_i)
+                    m.d.sync += self.wb_bus.dat_r.eq(self.sdram.dq_i.word_select(byte, 8))
                     m.d.sync += precharge_ctr.eq(0)
                     m.d.sync += precharge(bank)
                     m.next = 'precharge'
+            with m.State('read-before-write-data'):
+                m.d.sync += noop()
+                m.d.sync += read_ctr.eq(read_ctr + 1)
+                with m.If(read_ctr == cas_clks):
+                    m.d.sync += write_ctr.eq(0)
+                    byte_mask = ~(C(0xFF, 32) << (byte * 8))
+                    byte_val  = self.wb_bus.dat_w << (byte * 8)
+                    m.d.sync += write(bank, column, (self.sdram.dq_i & byte_mask) | byte_val)
+                    m.next = 'write-data'
             with m.State('write-data'):
                 m.d.sync += noop()
                 m.d.sync += write_ctr.eq(write_ctr + 1)
