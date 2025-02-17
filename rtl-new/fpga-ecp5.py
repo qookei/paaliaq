@@ -67,6 +67,9 @@ class FpgaTopLevel(Elaboratable):
         led = platform.request("led")
         m.d.comb += led.o.eq(top.timer.irq.i)
 
+        sdram = platform.request("sdram")
+        m.d.comb += sdram.clk.o.eq(ClockSignal("sdram"))
+
         return m
 
 
@@ -85,6 +88,14 @@ class PaaliaqPlatform(LatticeECP5Platform):
 
         *ButtonResources(pins="R7", invert=True,
                          attrs=Attrs(IO_TYPE="LVCMOS33", PULLMODE="UP")),
+
+        SDRAMResource(0,
+            clk="C8", we_n="B5", cas_n="A6", ras_n="B6",
+            ba="B7 A8", a="A9 B9 B10 C10 D9 C9 E9 D8 E8 C7 B8",
+            dq="B2  A2  C3  A3  B3  A4  B4  A5  E7  C6  D7  D6  E6  D5  C5  E5 "
+               "A11 B11 B12 A13 B13 A14 B14 D14 D13 E11 C13 D11 C12 E10 C11 D10",
+            attrs=Attrs(PULLMODE="NONE", DRIVE="4", SLEWRATE="FAST", IO_TYPE="LVCMOS33")
+        ),
 
         UARTResource(0, rx="R7", tx="T13"),
     ]
