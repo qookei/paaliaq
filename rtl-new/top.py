@@ -141,7 +141,7 @@ class TopLevel(Elaboratable):
         self.dec = wishbone.Decoder(addr_width=24, data_width=8)
         self.dec.add(self.ram.wb_bus, addr=0x000000)
         self.dec.add(self.csr_wb.wb_bus, addr=0x010000)
-        self.dec.add(self.sdram_ctrl.wb_bus, addr=0x200000)
+        self.dec.add(self.sdram_ctrl.wb_bus, addr=0x800000)
 
 
 
