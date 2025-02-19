@@ -4,13 +4,14 @@ from amaranth_soc import wishbone, event
 from amaranth_soc.wishbone.sram import *
 
 from amaranth.lib import wiring
+from amaranth.lib.wiring import In, Out
 
-from cpu import P65C816SoftCore, W65C816WishboneBridge
+from cpu import W65C816BusSignature, W65C816WishboneBridge
 
 
 from uart import UARTPeripheral
 
-from sdram import SDRAMController
+from sdram import SDRAMController, SDRAMSignature
 
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
@@ -113,9 +114,15 @@ class SystemTimer(wiring.Component):
         return m
 
 
-class TopLevel(Elaboratable):
+import pprint
+
+class TopLevel(wiring.Component):
+    cpu: In(W65C816BusSignature())
+    sdram: Out(SDRAMSignature())
+
     def __init__(self):
-        self.cpu = P65C816SoftCore()
+        super().__init__()
+
         self.cpu_bridge = W65C816WishboneBridge()
 
         self.ram = WishboneSRAM(size=0x10000, data_width=8, init=generate_boot_ram_contents('../toolchain/boot.bin'))
@@ -149,7 +156,6 @@ class TopLevel(Elaboratable):
         m = Module()
 
         m.submodules.ram = self.ram
-        m.submodules.cpu = self.cpu
         m.submodules.cpu_bridge = self.cpu_bridge
         m.submodules.dec = self.dec
         m.submodules.timer = self.timer
@@ -159,8 +165,9 @@ class TopLevel(Elaboratable):
         m.submodules.monitor = self.monitor
         m.submodules.sdram_ctrl = self.sdram_ctrl
 
+        wiring.connect(m, self.sdram_ctrl.sdram, wiring.flipped(self.sdram))
+        wiring.connect(m, self.cpu_bridge.cpu, wiring.flipped(self.cpu))
         wiring.connect(m, self.cpu_bridge.irq, self.monitor.src)
-        wiring.connect(m, self.cpu_bridge.cpu, self.cpu.iface)
         wiring.connect(m, self.cpu_bridge.wb_bus, self.dec.bus)
 
         return m

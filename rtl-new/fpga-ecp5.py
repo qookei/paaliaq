@@ -8,6 +8,7 @@ from top import TopLevel
 from uart import UARTTransmitter
 from probe import W65C816DebugProbe
 from sdram import SDRAMConnector
+from cpu import P65C816SoftCore
 
 
 class FpgaTopLevel(Elaboratable):
@@ -70,7 +71,10 @@ class FpgaTopLevel(Elaboratable):
         m.d.comb += led.o.eq(top.timer.irq.i)
 
         m.submodules.sdram = sdram = SDRAMConnector()
-        wiring.connect(m, sdram.sdram, top.sdram_ctrl.sdram)
+        wiring.connect(m, sdram.sdram, top.sdram)
+
+        m.submodules.cpu = cpu = P65C816SoftCore()
+        wiring.connect(m, cpu.iface, top.cpu)
 
         return m
 
