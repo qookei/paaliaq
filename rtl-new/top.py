@@ -119,7 +119,7 @@ def print_memory_map(memory_map, depth=0):
     print('Memory map:')
     for resource in memory_map.all_resources():
         path = '::'.join([name[0] for name in resource.path])
-        print(f' - {resource.start:#10x} - {resource.end:#10x} - {path}')
+        print(f' - [{resource.start:#010x}, {resource.end:#010x}) - {path}')
 
 
 class TopLevel(wiring.Component):
