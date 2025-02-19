@@ -39,8 +39,8 @@ class MMU(wiring.Component):
 
 
     class FaultReasonRegister(csr.Register, access="r"):
-        addr: csr.Field(csr.action.R, 24)
-        unused:      csr.Field(csr.action.R, 4)
+        addr:        csr.Field(csr.action.R, 24)
+        _unused:     csr.Field(csr.action.ResR0WA, 4)
         user:        csr.Field(csr.action.R, 1)
         ifetch:      csr.Field(csr.action.R, 1)
         write:       csr.Field(csr.action.R, 1)
@@ -63,7 +63,6 @@ class MMU(wiring.Component):
         self._pt_write = regs.add('PtWrite', self.PtWriteRegister())
 
         mmap = regs.as_memory_map()
-        print(list(mmap.resources()))
         self._bridge = csr.Bridge(mmap)
         self.bus.memory_map = mmap
 

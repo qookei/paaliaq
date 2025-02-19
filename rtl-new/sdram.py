@@ -57,7 +57,7 @@ class SDRAMController(wiring.Component):
         super().__init__()
 
         self.wb_bus.memory_map = MemoryMap(addr_width=23, data_width=8)
-        self.wb_bus.memory_map.add_resource(self, name=("sdram",), size=(1<<23))
+        self.wb_bus.memory_map.add_resource(self, name=('mem',), size=(1<<23))
         self.wb_bus.memory_map.freeze()
 
     def elaborate(self, platform):

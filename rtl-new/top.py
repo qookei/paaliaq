@@ -115,7 +115,12 @@ class SystemTimer(wiring.Component):
         return m
 
 
-import pprint
+def print_memory_map(memory_map, depth=0):
+    print('Memory map:')
+    for resource in memory_map.all_resources():
+        path = '::'.join([name[0] for name in resource.path])
+        print(f' - {resource.start:#10x} - {resource.end:#10x} - {path}')
+
 
 class TopLevel(wiring.Component):
     cpu: In(W65C816BusSignature())
@@ -170,6 +175,8 @@ class TopLevel(wiring.Component):
         # This freezes the CSR memory map.
         m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)
         wb_dec.add(csr_wb.wb_bus, addr=0x010000, name='csr')
+
+        print_memory_map(wb_dec.bus.memory_map)
 
         wiring.connect(m, self.cpu_bridge.cpu, wiring.flipped(self.cpu))
         wiring.connect(m, self.cpu_bridge.irq, evt_monitor.src)
