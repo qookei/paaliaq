@@ -1,0 +1,26 @@
+[project]
+name = "paaliaq-rtl"
+version = "0.1.0"
+description = "RTL code for the Paaliaq chipset"
+authors = [
+    {name = "qookie", email = ""},
+]
+dependencies = [
+    "yowasp-yosys",
+    "yowasp-nextpnr-ecp5",
+    "amaranth",
+    "amaranth-soc @ git+https://github.com/amaranth-lang/amaranth-soc",
+    "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards",
+]
+requires-python = ">=3.12"
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+
+
+[tool.pdm]
+distribution = false
+
+
+[tool.pdm.scripts]
+_.env_file = ".env.toolchain"
+build-ecp5 = {cmd = "python fpga-ecp5.py"}
