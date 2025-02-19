@@ -59,16 +59,16 @@ class FpgaTopLevel(Elaboratable):
             m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
             uart = platform.request("uart")
             m.d.comb += uart.tx.o.eq(probe.tx)
-            m.d.comb += top.uart.rx.eq(1)
+            m.d.comb += top.rx.eq(1)
         else:
             uart = platform.request("uart")
             m.d.comb += [
-                uart.tx.o.eq(top.uart.tx),
-                top.uart.rx.eq(uart.rx.i),
+                uart.tx.o.eq(top.tx),
+                top.rx.eq(uart.rx.i),
             ]
 
         led = platform.request("led")
-        m.d.comb += led.o.eq(top.timer.irq.i)
+        #m.d.comb += led.o.eq(top.timer.irq.i)
 
         m.submodules.sdram = sdram = SDRAMConnector()
         wiring.connect(m, sdram.sdram, top.sdram)

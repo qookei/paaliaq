@@ -12,6 +12,7 @@ from cpu import W65C816BusSignature, W65C816WishboneBridge
 from uart import UARTPeripheral
 
 from sdram import SDRAMController, SDRAMSignature
+from mmu import MMU
 
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
@@ -120,54 +121,58 @@ class TopLevel(wiring.Component):
     cpu: In(W65C816BusSignature())
     sdram: Out(SDRAMSignature())
 
+    tx: Out(1)
+    rx: In(1)
+
     def __init__(self):
         super().__init__()
 
+        # TODO(qookie): This can be moved below after some refactoring.
         self.cpu_bridge = W65C816WishboneBridge()
-
-        self.ram = WishboneSRAM(size=0x10000, data_width=8, init=generate_boot_ram_contents('../toolchain/boot.bin'))
-
-        self.timer = SystemTimer()
-        self.uart = UARTPeripheral()
-
-        self.csr_dec = csr.Decoder(addr_width=8, data_width=8)
-        self.csr_dec.add(self.uart.bus, name="uart")
-        self.csr_dec.add(self.timer.bus, name="timer")
-
-        evt_map = event.EventMap()
-        evt_map.add(self.timer.irq)
-
-        self.monitor = EventMonitor(evt_map, data_width=8)
-        self.csr_dec.add(self.monitor.bus, name="intc")
-
-        self.csr_dec.add(self.cpu_bridge.mmu.bus, name="mmu")
-        self.csr_wb = WishboneCSRBridge(self.csr_dec.bus)
-
-        self.sdram_ctrl = SDRAMController()
-
-        self.dec = wishbone.Decoder(addr_width=24, data_width=8)
-        self.dec.add(self.ram.wb_bus, addr=0x000000)
-        self.dec.add(self.csr_wb.wb_bus, addr=0x010000)
-        self.dec.add(self.sdram_ctrl.wb_bus, addr=0x800000)
-
 
 
     def elaborate(self, platform):
         m = Module()
+        evt_map = event.EventMap()
 
-        m.submodules.ram = self.ram
         m.submodules.cpu_bridge = self.cpu_bridge
-        m.submodules.dec = self.dec
-        m.submodules.timer = self.timer
-        m.submodules.uart = self.uart
-        m.submodules.csr_dec = self.csr_dec
-        m.submodules.csr_wb = self.csr_wb
-        m.submodules.monitor = self.monitor
-        m.submodules.sdram_ctrl = self.sdram_ctrl
 
-        wiring.connect(m, self.sdram_ctrl.sdram, wiring.flipped(self.sdram))
+        m.submodules.wb_dec = wb_dec = wishbone.Decoder(addr_width=24, data_width=8)
+
+        m.submodules.iram = iram = WishboneSRAM(size=0x10000, data_width=8,
+                                                init=generate_boot_ram_contents('../toolchain/boot.bin'))
+        wb_dec.add(iram.wb_bus, addr=0x000000, name='iram')
+
+        m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController()
+        wb_dec.add(sdram_ctrl.wb_bus, addr=0x800000, name='sdram')
+        wiring.connect(m, sdram_ctrl.sdram, wiring.flipped(self.sdram))
+
+        m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=8, data_width=8)
+
+        m.submodules.uart = uart = UARTPeripheral()
+        csr_dec.add(uart.bus, name='uart')
+        m.d.comb += [
+            self.tx.eq(uart.tx),
+            uart.rx.eq(self.rx),
+        ]
+
+        m.submodules.timer = timer = SystemTimer()
+        csr_dec.add(timer.bus, name='timer')
+        evt_map.add(timer.irq)
+
+        m.submodules.evt_monitor = evt_monitor = EventMonitor(evt_map, data_width=8)
+        csr_dec.add(evt_monitor.bus, name='intc')
+
+        m.submodules.mmu = mmu = MMU()
+        csr_dec.add(mmu.bus, name='mmu')
+        wiring.connect(m, self.cpu_bridge.mmu, mmu.iface)
+
+        # This freezes the CSR memory map.
+        m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)
+        wb_dec.add(csr_wb.wb_bus, addr=0x010000, name='csr')
+
         wiring.connect(m, self.cpu_bridge.cpu, wiring.flipped(self.cpu))
-        wiring.connect(m, self.cpu_bridge.irq, self.monitor.src)
-        wiring.connect(m, self.cpu_bridge.wb_bus, self.dec.bus)
+        wiring.connect(m, self.cpu_bridge.irq, evt_monitor.src)
+        wiring.connect(m, self.cpu_bridge.wb_bus, wb_dec.bus)
 
         return m
