@@ -18,41 +18,13 @@ from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
 from amaranth_soc.csr.event import EventMonitor
 
-def generate_boot_ram_contents():
-    vector_table = [
-        0x00, 0x00, # 0x00FFE0 (resv.)
-        0x00, 0x00, # 0x00FFE2 (resv.)
-        0x08, 0xFE, # 0x00FFE4 (COP)
-        0x00, 0x00, # 0x00FFE6 (BRK)
-        0x00, 0x00, # 0x00FFE8 (ABORT)
-        0x00, 0x00, # 0x00FFEA (NMI)
-        0x00, 0x00, # 0x00FFEC (resv.)
-        0x00, 0x00, # 0x00FFEE (IRQ)
 
-        0x00, 0x00, # 0x00FFF0 (resv.)
-        0x00, 0x00, # 0x00FFF2 (resv.)
-        0x00, 0x00, # 0x00FFF4 (COP)
-        0x00, 0x00, # 0x00FFF6 (resv.)
-        0x00, 0x00, # 0x00FFF8 (ABORT)
-        0x00, 0x00, # 0x00FFFA (NMI)
-        0x00, 0xFE, # 0x00FFFC (RESET)
-        0x00, 0x00, # 0x00FFFE (IRQ/BRK)
-    ]
-
-    code = [
-                                # 00FE00 reset:
-        0x18,                   # 00FE00   CLC
-        0xFB,                   # 00FE01   XCE
-        0xF4, 0x01, 0x01,       # 00FE02   PEA $0101
-        0xAB, 0xAB,             # 00FE05   PLB : PLB
-        0x2C, 0x01, 0x00,       # 00FE07   BIT $0001      UART_STATUS
-        0x10, 0xFB,             # 00FE0A   BPL $FE07      bit 7 clear? (TX_FIFO_NOT_FULL)
-        0x1A,                   # 00FE0C   INA
-        0x8D, 0x02, 0x00,       # 00FE0D   STA $0002      TX_DATA
-        0x4C, 0x07, 0xFE,       # 00FE0C   JMP $FE07
-    ]
-
-    return [0] * (0x10000 - 0x200) + code + [0] * (0x200 - len(code) - len(vector_table)) + vector_table
+def generate_boot_ram_contents(src_file):
+    with open(src_file, 'rb') as f:
+        out = [0] * 0x8000 + list(f.read())
+        out[0xFFFC] = 0x00
+        out[0xFFFD] = 0x80
+        return out
 
 
 class SystemTimer(wiring.Component):
