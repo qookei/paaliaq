@@ -117,7 +117,7 @@ class TopLevel(wiring.Component):
         m.submodules.wb_dec = wb_dec = wishbone.Decoder(addr_width=24, data_width=8)
 
         m.submodules.iram = iram = WishboneSRAM(size=0x10000, data_width=8,
-                                                init=generate_boot_ram_contents('../toolchain/boot.bin'))
+                                                init=generate_boot_ram_contents('../build/src/boot/memtest.bin'))
         wb_dec.add(iram.wb_bus, addr=0x000000, name='iram')
 
         m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController()
