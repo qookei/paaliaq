@@ -20,6 +20,35 @@ class SDRAMSignature(wiring.Signature):
         })
 
 
+class SDRAMConnector(wiring.Component):
+    sdram: In(SDRAMSignature())
+
+    def __init__(self, sdram_domain='sdram'):
+        super().__init__()
+
+        self._sdram_domain = sdram_domain
+
+
+    def elaborate(self, platform):
+        m = Module()
+
+        sdram = platform.request('sdram')
+        m.d.comb += sdram.clk.o.eq(ClockSignal(self._sdram_domain))
+
+        m.d.comb += [
+            sdram.ba.o.eq(self.sdram.ba),
+            sdram.a.o.eq(self.sdram.a),
+            sdram.dq.oe.eq(self.sdram.we),
+            sdram.dq.o.eq(self.sdram.dq_o),
+            self.sdram.dq_i.eq(sdram.dq.i),
+            sdram.we.o.eq(self.sdram.we),
+            sdram.ras.o.eq(self.sdram.ras),
+            sdram.cas.o.eq(self.sdram.cas),
+        ]
+
+        return m
+
+
 class SDRAMController(wiring.Component):
     wb_bus: In(wishbone.Signature(addr_width=23, data_width=8))
     sdram: Out(SDRAMSignature())

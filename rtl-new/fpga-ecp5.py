@@ -1,4 +1,5 @@
 from amaranth import *
+from amaranth.lib import wiring
 from amaranth.build import *
 from amaranth.vendor import LatticeECP5Platform
 from amaranth_boards.resources import *
@@ -6,6 +7,7 @@ from amaranth_boards.resources import *
 from top import TopLevel
 from uart import UARTTransmitter
 from probe import W65C816DebugProbe
+from sdram import SDRAMConnector
 
 
 class FpgaTopLevel(Elaboratable):
@@ -67,19 +69,8 @@ class FpgaTopLevel(Elaboratable):
         led = platform.request("led")
         m.d.comb += led.o.eq(top.timer.irq.i)
 
-        sdram = platform.request("sdram")
-        m.d.comb += sdram.clk.o.eq(ClockSignal("sdram"))
-
-        m.d.comb += [
-            sdram.ba.o.eq(top.sdram_ctrl.sdram.ba),
-            sdram.a.o.eq(top.sdram_ctrl.sdram.a),
-            sdram.dq.oe.eq(top.sdram_ctrl.sdram.we),
-            sdram.dq.o.eq(top.sdram_ctrl.sdram.dq_o),
-            top.sdram_ctrl.sdram.dq_i.eq(sdram.dq.i),
-            sdram.we.o.eq(top.sdram_ctrl.sdram.we),
-            sdram.ras.o.eq(top.sdram_ctrl.sdram.ras),
-            sdram.cas.o.eq(top.sdram_ctrl.sdram.cas),
-        ]
+        m.submodules.sdram = sdram = SDRAMConnector()
+        wiring.connect(m, sdram.sdram, top.sdram_ctrl.sdram)
 
         return m
 
