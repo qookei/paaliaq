@@ -8,7 +8,7 @@ from top import TopLevel
 from uart import UARTTransmitter
 from probe import W65C816DebugProbe
 from sdram import SDRAMConnector
-from cpu import P65C816SoftCore
+from cpu import W65C816Connector, P65C816SoftCore
 
 
 class FpgaTopLevel(Elaboratable):
@@ -73,10 +73,34 @@ class FpgaTopLevel(Elaboratable):
         m.submodules.sdram = sdram = SDRAMConnector()
         wiring.connect(m, sdram.sdram, top.sdram)
 
-        m.submodules.cpu = cpu = P65C816SoftCore()
+        m.submodules.cpu = cpu = P65C816SoftCore() if True else W65C816Connector()
         wiring.connect(m, cpu.iface, top.cpu)
 
         return m
+
+
+def W65C816Resource(*args, clk, rst, addr, data, rwb, vda, vpa, vpb,
+                    irq, nmi, abort, conn=None, attrs=None):
+    io = []
+
+    io.append(Subsignal('clk', Pins(clk, dir='o', conn=conn, assert_width=1)))
+    io.append(Subsignal('rst', Pins(rst, dir='o', conn=conn, assert_width=1)))
+
+    io.append(Subsignal('addr', Pins(addr, dir='i', conn=conn, assert_width=16)))
+    io.append(Subsignal('data', Pins(data, dir='io', conn=conn, assert_width=8)))
+
+    io.append(Subsignal('rwb', Pins(rwb, dir='i', conn=conn, assert_width=1)))
+    io.append(Subsignal('vda', Pins(vda, dir='i', conn=conn, assert_width=1)))
+    io.append(Subsignal('vpa', Pins(vpa, dir='i', conn=conn, assert_width=1)))
+    io.append(Subsignal('vpb', Pins(vpb, dir='i', conn=conn, assert_width=1)))
+
+    io.append(Subsignal('irq',   Pins(irq,   dir='o', conn=conn, assert_width=1)))
+    io.append(Subsignal('nmi',   Pins(nmi,   dir='o', conn=conn, assert_width=1)))
+    io.append(Subsignal('abort', Pins(abort, dir='o', conn=conn, assert_width=1)))
+
+    if attrs is not None:
+        io.append(attrs)
+    return Resource.family(*args, default_name='w65c816', ios=io)
 
 
 class PaaliaqPlatform(LatticeECP5Platform):
@@ -104,6 +128,18 @@ class PaaliaqPlatform(LatticeECP5Platform):
         ),
 
         UARTResource(0, rx="R7", tx="T13"),
+
+        # XXX(qookie): This is not the final pin assignment. I haven't
+        # designed the PCB with the CPU yet, I just want to see the
+        # fMAX when using an external CPU.
+        W65C816Resource(
+            0,
+            clk="C4", rst="D4",
+            addr="E4 D3 F5 E3 F1 F2 G2 G1 H2 H3 B1 C2 C1 D1 E2 E1",
+            data="P5 R3 P2 R2 T2 N6 N14 R12",
+            rwb="R14", vda="T14", vpa="P12", vpb="P14",
+            irq="R15", nmi="T15", abort="P13"
+        )
     ]
 
     connectors = []

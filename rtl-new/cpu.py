@@ -33,6 +33,31 @@ class W65C816BusSignature(wiring.Signature):
         })
 
 
+class W65C816Connector(wiring.Component):
+    iface: Out(W65C816BusSignature())
+
+    def elaborate(self, platform):
+        m = Module()
+
+        cpu = platform.request('w65c816')
+        m.d.comb += [
+            self.iface.addr_lo.eq(cpu.addr.i),
+            self.iface.addr_hi.eq(cpu.data.i),
+            cpu.data.o.eq(self.iface.r_data),
+            cpu.data.oe.eq(self.iface.r_data_en),
+            self.iface.w_data.eq(cpu.data.i),
+            self.iface.rw.eq(cpu.rwb.i),
+            self.iface.vda.eq(cpu.vda.i),
+            self.iface.vpa.eq(cpu.vpa.i),
+            self.iface.vpb.eq(cpu.vpb.i),
+            cpu.irq.o.eq(self.iface.irq),
+            cpu.nmi.o.eq(self.iface.nmi),
+            cpu.abort.o.eq(self.iface.abort),
+        ]
+
+        return m
+
+
 class P65C816SoftCore(wiring.Component):
     iface: Out(W65C816BusSignature())
 
