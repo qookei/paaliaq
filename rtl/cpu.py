@@ -58,6 +58,14 @@ class W65C816Connector(wiring.Component):
         return m
 
 
+class PMCSignature(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            'clks': Out(32),
+            'insns': Out(32),
+        })
+
+
 class P65C816SoftCore(wiring.Component):
     iface: Out(W65C816BusSignature())
 
@@ -92,6 +100,7 @@ class W65C816WishboneBridge(wiring.Component):
     debug_trigger: Out(1)
     irq: In(event.Source().signature)
     mmu: In(MMUSignature())
+    pmc: Out(PMCSignature())
 
 
     def elaborate(self, platform):
@@ -183,6 +192,14 @@ class W65C816WishboneBridge(wiring.Component):
         # STB_O are always the same.
         m.d.comb += self.wb_bus.stb.eq(self.wb_bus.cyc)
 
+        clk_ctr = Signal(32)
+        insn_ctr = Signal(32)
+
+        m.d.comb += [
+            self.pmc.clks.eq(clk_ctr),
+            self.pmc.insns.eq(insn_ctr),
+        ]
+
         with m.FSM():
             with m.State('rst-clk-low'):
                 m.d.sync += [
@@ -202,7 +219,8 @@ class W65C816WishboneBridge(wiring.Component):
             with m.State('clk-falling-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(0),
-                    ctr.eq(0)
+                    ctr.eq(0),
+                    clk_ctr.eq(clk_ctr + 1)
                 ]
                 m.next = 'clear-r_data_en'
             with m.State('clear-r_data_en'):
@@ -218,8 +236,10 @@ class W65C816WishboneBridge(wiring.Component):
                         self.mmu.vaddr.eq(Cat(self.cpu.addr_lo, self.cpu.addr_hi)),
                         self.mmu.write.eq(~self.cpu.rw),
                         self.mmu.ifetch.eq(self.cpu.vpa),
-                        ctr.eq(0)
+                        ctr.eq(0),
                     ]
+                    with m.If(self.cpu.vpa & self.cpu.vda):
+                        m.d.sync += insn_ctr.eq(insn_ctr + 1)
                     m.next = 'mmu-stb-hi'
             with m.State('mmu-stb-hi'):
                 m.d.sync += self.mmu.stb.eq(self.cpu.vda | self.cpu.vpa)

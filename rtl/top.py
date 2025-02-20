@@ -6,7 +6,7 @@ from amaranth_soc.wishbone.sram import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from cpu import W65C816BusSignature, W65C816WishboneBridge
+from cpu import W65C816BusSignature, PMCSignature, W65C816WishboneBridge
 
 
 from uart import UARTPeripheral
@@ -86,6 +86,39 @@ class SystemTimer(wiring.Component):
 
         return m
 
+class PerformanceCounters(wiring.Component):
+    bus: In(csr.Signature(addr_width=4, data_width=8))
+    pmc: In(PMCSignature())
+
+    class CounterRegister(csr.Register, access="r"):
+        value: csr.Field(csr.action.R, 32)
+
+
+    def __init__(self):
+        super().__init__()
+
+        regs = csr.Builder(addr_width=4, data_width=8)
+
+        self._clks = regs.add("Clks", self.CounterRegister())
+        self._insns = regs.add("Insns", self.CounterRegister())
+
+        mmap = regs.as_memory_map()
+        self._bridge = csr.Bridge(mmap)
+        self.bus.memory_map = mmap
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.bridge = self._bridge
+        wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
+
+        m.d.comb += [
+            self._clks.f.value.r_data.eq(self.pmc.clks),
+            self._insns.f.value.r_data.eq(self.pmc.insns),
+        ]
+
+        return m
+
 
 def print_memory_map(memory_map, depth=0):
     print('Memory map:')
@@ -143,6 +176,10 @@ class TopLevel(wiring.Component):
         m.submodules.mmu = mmu = MMU()
         csr_dec.add(mmu.bus, name='mmu')
         wiring.connect(m, self.cpu_bridge.mmu, mmu.iface)
+
+        m.submodules.pmc = pmc = PerformanceCounters()
+        csr_dec.add(pmc.bus, name='pmc')
+        wiring.connect(m, self.cpu_bridge.pmc, pmc.pmc)
 
         # This freezes the CSR memory map.
         m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)
