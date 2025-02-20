@@ -31,11 +31,6 @@
 
 	#:tests
 
-	ldx (imm test0-str)
-	jsr puts
-	jsr test0
-	jsr log-test-result
-
 	ldx (imm test1-str)
 	jsr puts
 	jsr test1
@@ -62,7 +57,6 @@
   (.byte fail-str ,@(map char->integer (string->list " FAIL\r\n")) 0)
   (.byte write-str ,@(map char->integer (string->list " writing 80 ")) 0)
   (.byte check-str ,@(map char->integer (string->list " checking 80 ")) 0)
-  (.byte test0-str ,@(map char->integer (string->list "Test 0 - zero fill   ... ")) 0)
   (.byte test1-str ,@(map char->integer (string->list "Test 1 - walking 1s  ... ")) 0)
   (.byte test2-str ,@(map char->integer (string->list "Test 2 - walking 0s  ... ")) 0)
   (.byte test3-str ,@(map char->integer (string->list "Test 3 - random fill ... ")) 0)
@@ -93,61 +87,6 @@
 	jsr puthex-byte
 	lda #x20
 	jmp putc)
-
-
-  (proc test0 .a-bits 16 .xy-bits 16
-	lda ,(bank-nr SDRAM-BASE)
-	sta (dp 2)
-	stz (dp 0)
-
-	ldx (imm write-str)
-	jsr puts
-
-	#:fill-loop
-	sep #b00100000 .a-bits 8
-	lda 0
-	sta (ind-far-dp 0)
-	rep #b00100000 .a-bits 16
-
-	inc (dp 0)
-	bne fill-loop
-	inc (dp 2)
-	lda (dp 2)
-	cmp ,(bank-nr SDRAM-END)
-	beq fill-done
-	jsr show-bank
-	bra fill-loop
-
-	#:fill-done
-	lda ,(bank-nr SDRAM-BASE)
-	sta (dp 2)
-	stz (dp 0)
-
-	ldx (imm check-str)
-	jsr puts
-
-	#:test-loop
-	sep #b00100000 .a-bits 8
-	lda (ind-far-dp 0)
-	rep #b00100000 .a-bits 16
-	bne fail
-
-	inc (dp 0)
-	bne test-loop
-	inc (dp 2)
-	lda (dp 2)
-	cmp ,(bank-nr SDRAM-END)
-	beq test-done
-	jsr show-bank
-	bra test-loop
-
-	#:test-done
-	clc
-	rts
-
-	#:fail
-	sec
-	rts)
 
 
   (proc test1 .a-bits 16 .xy-bits 16

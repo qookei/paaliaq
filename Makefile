@@ -29,8 +29,8 @@ build/src/boot/memtest.bin: build/src/boot/memtest.elf
 
 build/memtest.bin: build/src/boot/memtest.bin
 	mkdir -p ${dir $@}
-	(printf "0\x00\x90\x00\x00\x08"; cat $<) > $@
-	truncate -s 2054 $@
+	(printf "0\x00\x90\x00\x00\x04"; cat $<) > $@
+	truncate -s 1030 $@
 
 
 .PHONY: clean
