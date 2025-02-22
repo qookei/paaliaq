@@ -149,35 +149,31 @@ class W65C816WishboneBridge(wiring.Component):
         def ns_to_cycles(ns):
             return int((ns * platform.target_clk_frequency) / 1000000000)
 
-        clks_hold_r_data = ns_to_cycles(tDHR)
+        # Note: times of less than 15ns or so need 1 FPGA clock cycle,
+        # so they don't have associated counters, and instead just an
+        # intermediate state. This affects:
+        # - the time we drive the data bus after the clock goes low,
+        # - the time we wait before driving the clock high.
+
         clks_latch_addr = ns_to_cycles(tADS - tDHR)
-        clks_wait_low = ns_to_cycles(tPWL - tDHR - tADS)
+        latch_addr_ctr = Signal(range(clks_latch_addr + 1))
+        print(f'Will latch address after {clks_latch_addr} clocks')
+
         clks_w_data_valid = ns_to_cycles(tMDS)
+        w_data_valid_ctr = Signal(range(clks_w_data_valid + 1))
+        print(f'Will wait for w_data for {clks_w_data_valid} clocks')
+
         clks_wait_high = ns_to_cycles(tPWH - tMDS)
+        wait_high_ctr = Signal(range(clks_wait_high + 1))
+        print(f'Will wait high for {clks_wait_high} clocks')
+
         clks_rst_low = ns_to_cycles(tPWL)
+        rst_low_ctr = Signal(range(clks_rst_low + 1))
+        print(f'Will hold clock during reset low for {clks_rst_low} clocks')
+
         clks_rst_high = ns_to_cycles(tPWH)
-
-        max_clks = max(clks_hold_r_data,
-                       clks_latch_addr,
-                       clks_wait_low,
-                       clks_w_data_valid,
-                       clks_wait_high,
-                       clks_rst_low,
-                       clks_rst_high)
-
-        ctr = Signal(range(max_clks + 1))
-
-        if False:
-            delay_clks = int(platform.target_clk_frequency / 256)
-            delay_timer = Signal(range(delay_clks + 1))
-
-            with m.If(delay_timer == delay_clks):
-                m.d.sync += delay_timer.eq(0)
-                m.d.sync += ctr.eq(ctr + 1)
-            with m.Else():
-                m.d.sync += delay_timer.eq(delay_timer + 1)
-        else:
-            m.d.sync += ctr.eq(ctr + 1)
+        rst_high_ctr = Signal(range(clks_rst_high + 1))
+        print(f'Will hold clock during reset high for {clks_rst_high} clocks')
 
         m.d.comb += self.cpu.nmi.eq(~self.mmu.abort)
         m.d.comb += self.cpu.irq.eq(~self.irq.i)
@@ -205,38 +201,37 @@ class W65C816WishboneBridge(wiring.Component):
                 m.d.sync += [
                     self.cpu.rst.eq(0),
                     self.cpu.clk.eq(0),
+                    rst_low_ctr.eq(rst_low_ctr + 1)
                 ]
-                with m.If(ctr == clks_rst_low):
+                with m.If(rst_low_ctr == clks_rst_low):
                     m.next = 'rst-clk-high'
-                    m.d.sync += ctr.eq(0)
             with m.State('rst-clk-high'):
                 m.d.sync += [
                     self.cpu.clk.eq(1),
+                    rst_high_ctr.eq(rst_high_ctr + 1)
                 ]
-                with m.If(ctr == clks_rst_high):
+                with m.If(rst_high_ctr == clks_rst_high):
                     m.next = 'clk-falling-edge'
                     m.d.sync += self.cpu.rst.eq(1)
             with m.State('clk-falling-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(0),
-                    ctr.eq(0),
                     clk_ctr.eq(clk_ctr + 1)
                 ]
                 m.next = 'clear-r_data_en'
             with m.State('clear-r_data_en'):
-                with m.If(ctr == clks_hold_r_data):
-                    m.d.sync += [
-                        self.cpu.r_data_en.eq(0),
-                        ctr.eq(0)
-                    ]
-                    m.next = 'latch-address'
+                m.d.sync += [
+                    self.cpu.r_data_en.eq(0),
+                    latch_addr_ctr.eq(0)
+                ]
+                m.next = 'latch-address'
             with m.State('latch-address'):
-                with m.If(ctr == clks_latch_addr):
+                m.d.sync += latch_addr_ctr.eq(latch_addr_ctr + 1)
+                with m.If(latch_addr_ctr == clks_latch_addr):
                     m.d.sync += [
                         self.mmu.vaddr.eq(Cat(self.cpu.addr_lo, self.cpu.addr_hi)),
                         self.mmu.write.eq(~self.cpu.rw),
                         self.mmu.ifetch.eq(self.cpu.vpa),
-                        ctr.eq(0),
                     ]
                     with m.If(self.cpu.vpa & self.cpu.vda):
                         m.d.sync += insn_ctr.eq(insn_ctr + 1)
@@ -246,26 +241,27 @@ class W65C816WishboneBridge(wiring.Component):
                 m.next = 'mmu-stb-lo'
             with m.State('mmu-stb-lo'):
                 m.d.sync += self.mmu.stb.eq(0)
-                with m.If(ctr == clks_wait_low):
-                    m.next = 'clk-rising-edge'
+                m.next = 'clk-rising-edge'
             with m.State('clk-rising-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(1),
-                    ctr.eq(0)
+                    w_data_valid_ctr.eq(0)
                 ]
                 m.next = 'initiate-transaction'
             with m.State('initiate-transaction'):
-                with m.If(ctr == clks_w_data_valid):
+                m.d.sync += w_data_valid_ctr.eq(w_data_valid_ctr + 1)
+                with m.If(w_data_valid_ctr == clks_w_data_valid):
                     # XXX: Is this right?
                     m.d.sync += [
                         self.wb_bus.adr.eq(self.mmu.paddr),
                         self.wb_bus.cyc.eq((self.cpu.vda | self.cpu.vpa) & self.cpu.abort),
                         self.wb_bus.we.eq(~self.cpu.rw),
                         self.wb_bus.dat_w.eq(self.cpu.w_data),
-                        ctr.eq(0)
+                        wait_high_ctr.eq(0)
                     ]
                     m.next = 'complete-transaction'
             with m.State('complete-transaction'):
+                m.d.sync += wait_high_ctr.eq(wait_high_ctr + 1)
                 with m.If(~self.wb_bus.cyc): # No-op cycle
                     m.next = 'wait-high'
 
@@ -291,9 +287,10 @@ class W65C816WishboneBridge(wiring.Component):
                     # unmapped addresses...
                     pass
             with m.State('wait-high'):
+                m.d.sync += wait_high_ctr.eq(wait_high_ctr + 1)
                 # Wait for some time before taking the clock low.
                 m.d.sync += self.debug_trigger.eq(0)
-                with m.If(ctr >= clks_wait_high):
+                with m.If(wait_high_ctr >= clks_wait_high):
                     m.next = 'clk-falling-edge'
 
         return m
