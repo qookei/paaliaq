@@ -197,6 +197,9 @@ class SDRAMController(wiring.Component):
         row = self.wb_bus.adr.bit_select(10, 11)
         bank = self.wb_bus.adr.bit_select(21, 2)
 
+        banks_active = Signal(4)
+        current_rows = Array([Signal(8) for _ in range(4)])
+
         with m.FSM():
             # Initialization states
             with m.State('init-wait'):
@@ -236,10 +239,42 @@ class SDRAMController(wiring.Component):
                 m.d.sync += noop()
                 with m.If(pending_refresh):
                     m.d.sync += pending_refresh.eq(0)
-                    m.d.sync += refresh_ctr.eq(0)
-                    m.d.sync += autorefresh()
-                    m.next = 'refresh'
+                    with m.If(banks_active.any()):
+                        # Precharge before refresh if any bank is not idle.
+                        m.d.sync += precharge_ctr.eq(0)
+                        m.d.sync += precharge_all()
+                        m.next = 'precharge-then-refresh'
+                    with m.Else():
+                        m.d.sync += refresh_ctr.eq(0)
+                        m.d.sync += autorefresh()
+                        m.next = 'refresh'
                 with m.Elif(trans_pending):
+                    # The target row is already active in the target bank.
+                    with m.If(banks_active.bit_select(bank, 1) & (row == current_rows[bank])):
+                        # Go do the read/write immediately.
+                        m.d.sync += read_ctr.eq(0)
+                        m.d.sync += read(bank, column)
+                        with m.If(self.wb_bus.we):
+                            m.next = 'read-before-write-data'
+                        with m.Else():
+                            m.next = 'read-data'
+                    # The target bank is idle.
+                    with m.Elif(~banks_active.bit_select(bank, 1)):
+                        # Activate the row and go do the read/write.
+                        m.d.sync += activate_ctr.eq(0)
+                        m.d.sync += activate_row(bank, row)
+                        m.next = 'activate-row'
+                    # The target bank is active but on the wrong row.
+                    with m.Else():
+                        # Precharge the bank, activate the row, and go do the read/write.
+                        m.d.sync += precharge_ctr.eq(0)
+                        m.d.sync += precharge(bank)
+                        m.next = 'precharge-then-activate'
+            with m.State('precharge-then-activate'):
+                m.d.sync += noop()
+                m.d.sync += precharge_ctr.eq(precharge_ctr + 1)
+                with m.If(precharge_ctr == precharge_clks):
+                    m.d.sync += banks_active.bit_select(bank, 1).eq(0)
                     m.d.sync += activate_ctr.eq(0)
                     m.d.sync += activate_row(bank, row)
                     m.next = 'activate-row'
@@ -247,6 +282,8 @@ class SDRAMController(wiring.Component):
                 m.d.sync += noop()
                 m.d.sync += activate_ctr.eq(activate_ctr + 1)
                 with m.If(activate_ctr == activate_clks):
+                    m.d.sync += banks_active.bit_select(bank, 1).eq(1)
+                    m.d.sync += current_rows[bank].eq(row)
                     m.d.sync += read_ctr.eq(0)
                     m.d.sync += read(bank, column)
                     with m.If(self.wb_bus.we):
@@ -258,9 +295,9 @@ class SDRAMController(wiring.Component):
                 m.d.sync += read_ctr.eq(read_ctr + 1)
                 with m.If(read_ctr == cas_clks):
                     m.d.sync += self.wb_bus.dat_r.eq(self.sdram.dq_i.word_select(byte, 8))
-                    m.d.sync += precharge_ctr.eq(0)
-                    m.d.sync += precharge(bank)
-                    m.next = 'precharge'
+                    m.d.sync += trans_ack.eq(1)
+                    m.d.sync += trans_pending.eq(0)
+                    m.next = 'idle'
             with m.State('read-before-write-data'):
                 m.d.sync += noop()
                 m.d.sync += read_ctr.eq(read_ctr + 1)
@@ -275,16 +312,17 @@ class SDRAMController(wiring.Component):
                 m.d.sync += write_ctr.eq(write_ctr + 1)
                 with m.If(write_ctr == write_clks):
                     m.d.sync += self.sdram.dq_o.eq(0)
-                    m.d.sync += precharge_ctr.eq(0)
-                    m.d.sync += precharge(bank)
-                    m.next = 'precharge'
-            with m.State('precharge'):
-                m.d.sync += trans_ack.eq(1)
-                m.d.sync += trans_pending.eq(0)
+                    m.d.sync += trans_ack.eq(1)
+                    m.d.sync += trans_pending.eq(0)
+                    m.next = 'idle'
+            with m.State('precharge-then-refresh'):
                 m.d.sync += noop()
                 m.d.sync += precharge_ctr.eq(precharge_ctr + 1)
                 with m.If(precharge_ctr == precharge_clks):
-                    m.next = 'idle'
+                    m.d.sync += banks_active.eq(0)
+                    m.d.sync += refresh_ctr.eq(0)
+                    m.d.sync += autorefresh()
+                    m.next = 'refresh'
             with m.State('refresh'):
                 m.d.sync += noop()
                 m.d.sync += refresh_ctr.eq(refresh_ctr + 1)
