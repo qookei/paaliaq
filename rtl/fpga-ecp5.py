@@ -1,3 +1,5 @@
+import argparse
+
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.build import *
@@ -12,6 +14,11 @@ from cpu import W65C816Connector, P65C816SoftCore
 
 
 class FpgaTopLevel(Elaboratable):
+    def __init__(self, *, external_cpu=False, debug_probe=False):
+        super().__init__()
+        self._external_cpu = external_cpu
+        self._debug_probe = debug_probe
+
     def elaborate(self, platform):
         m = Module()
 
@@ -55,7 +62,7 @@ class FpgaTopLevel(Elaboratable):
 
         m.submodules.top = top = TopLevel()
 
-        if False:
+        if self._debug_probe:
             m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
             uart = platform.request("uart")
             m.d.comb += uart.tx.o.eq(probe.tx)
@@ -73,7 +80,7 @@ class FpgaTopLevel(Elaboratable):
         m.submodules.sdram = sdram = SDRAMConnector()
         wiring.connect(m, sdram.sdram, top.sdram)
 
-        m.submodules.cpu = cpu = P65C816SoftCore() if True else W65C816Connector()
+        m.submodules.cpu = cpu = W65C816Connector() if self._external_cpu else P65C816SoftCore()
         wiring.connect(m, cpu.iface, top.cpu)
 
         return m
@@ -110,6 +117,11 @@ class PaaliaqPlatform(LatticeECP5Platform):
     default_clk          = "clk25"
     target_clk_frequency = 75000000
 
+    def __init__(self, *, use_abc9=True):
+        super().__init__()
+        self._use_abc9 = use_abc9
+
+
     resources = [
         Resource("clk25", 0, Pins("P6", dir="i"), Clock(25e6), Attrs(IO_TYPE="LVCMOS33")),
 
@@ -138,20 +150,28 @@ class PaaliaqPlatform(LatticeECP5Platform):
             addr="E4 D3 F5 E3 F1 F2 G2 G1 H2 H3 B1 C2 C1 D1 E2 E1",
             data="P5 R3 P2 R2 T2 N6 N14 R12",
             rwb="R14", vda="T14", vpa="P12", vpb="P14",
-            irq="R15", nmi="T15", abort="P13"
+            irq="R15", nmi="T15", abort="P13",
+            attrs=Attrs(PULLMODE="NONE", DRIVE="4", SLEWRATE="FAST", IO_TYPE="LVCMOS33")
         )
     ]
 
     connectors = []
 
     def toolchain_prepare(self, fragment, name, **kwargs):
-        # FIXME: Drop `-noabc9` once that works. (Bug YosysHQ/yosys#4249)
-        overrides = dict(synth_opts="-noabc9", ecppack_opts="--compress")
+        overrides = dict(ecppack_opts="--compress")
+        if not self._use_abc9:
+            overrides['synth_opts'] = '-noabc9'
         overrides.update(kwargs)
         return super().toolchain_prepare(fragment, name, **overrides)
 
 
 if __name__ == '__main__':
-    platform = PaaliaqPlatform()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--external-cpu', action='store_true')
+
+    args = parser.parse_args()
+    # FIXME(qookie): Don't disable ABC9 once it's fixed and doesn't
+    # croak on the P65C816 soft-core. (Bug YosysHQ/yosys#4249).
+    platform = PaaliaqPlatform(use_abc9=args.external_cpu)
     platform.add_file('65c816.v', open('65c816.v'))
-    platform.build(FpgaTopLevel())
+    platform.build(FpgaTopLevel(external_cpu=args.external_cpu))
