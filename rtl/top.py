@@ -42,8 +42,10 @@ class SystemTimer(wiring.Component):
         deadline: csr.Field(csr.action.RW, 32)
 
 
-    def __init__(self):
+    def __init__(self, *, target_clk):
         regs = csr.Builder(addr_width=4, data_width=8)
+
+        self._target_clk = target_clk
 
         self._config = regs.add("Config", self.ConfigRegister())
         self._time = regs.add("Time", self.TimeRegister(), offset=4)
@@ -65,7 +67,7 @@ class SystemTimer(wiring.Component):
         time = Signal(32)
 
         rate = 1000 # Hz
-        clks_per_tick = int(platform.target_clk_frequency / rate)
+        clks_per_tick = int(self._target_clk / rate)
 
         ctr = Signal(range(clks_per_tick + 1))
 
@@ -134,11 +136,12 @@ class TopLevel(wiring.Component):
     tx: Out(1)
     rx: In(1)
 
-    def __init__(self):
+    def __init__(self, *, target_clk):
         super().__init__()
 
+        self._target_clk = target_clk
         # TODO(qookie): This can be moved below after some refactoring.
-        self.cpu_bridge = W65C816WishboneBridge()
+        self.cpu_bridge = W65C816WishboneBridge(target_clk=target_clk)
 
 
     def elaborate(self, platform):
@@ -153,20 +156,20 @@ class TopLevel(wiring.Component):
                                                 init=generate_boot_ram_contents('../build/boot0.bin'))
         wb_dec.add(iram.wb_bus, addr=0x000000, name='iram')
 
-        m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController()
+        m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController(target_clk=self._target_clk)
         wb_dec.add(sdram_ctrl.wb_bus, addr=0x800000, name='sdram')
         wiring.connect(m, sdram_ctrl.sdram, wiring.flipped(self.sdram))
 
         m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=8, data_width=8)
 
-        m.submodules.uart = uart = UARTPeripheral()
+        m.submodules.uart = uart = UARTPeripheral(target_clk=self._target_clk)
         csr_dec.add(uart.bus, name='uart')
         m.d.comb += [
             self.tx.eq(uart.tx),
             uart.rx.eq(self.rx),
         ]
 
-        m.submodules.timer = timer = SystemTimer()
+        m.submodules.timer = timer = SystemTimer(target_clk=self._target_clk)
         csr_dec.add(timer.bus, name='timer')
         evt_map.add(timer.irq)
 

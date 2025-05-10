@@ -53,9 +53,10 @@ class SDRAMController(wiring.Component):
     wb_bus: In(wishbone.Signature(addr_width=23, data_width=8))
     sdram: Out(SDRAMSignature())
 
-    def __init__(self):
+    def __init__(self, *, target_clk):
         super().__init__()
 
+        self._target_clk = target_clk
         self.wb_bus.memory_map = MemoryMap(addr_width=23, data_width=8)
         self.wb_bus.memory_map.add_resource(self, name=('mem',), size=(1<<23))
         self.wb_bus.memory_map.freeze()
@@ -134,7 +135,7 @@ class SDRAMController(wiring.Component):
             ]
 
         def ns_to_clks(ns):
-            return int(math.ceil(ns * platform.target_clk_frequency / 1000000000))
+            return int(math.ceil(ns * self._target_clk / 1000000000))
 
         init_clks = ns_to_clks(200000)
         init_ctr = Signal(range(init_clks + 1))

@@ -94,7 +94,7 @@ class MMU(wiring.Component):
         with m.If(self.iface.stb):
             m.d.sync += [
                 self.iface.paddr.eq(paddr),
-                self.iface.abort.eq(abort_miss | abort_write | abort_ifetch)
+                self.iface.abort.eq(abort)
             ]
 
             with m.If(abort):

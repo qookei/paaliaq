@@ -103,6 +103,11 @@ class W65C816WishboneBridge(wiring.Component):
     pmc: Out(PMCSignature())
 
 
+    def __init__(self, *, target_clk):
+        super().__init__()
+        self._target_clk = target_clk
+
+
     def elaborate(self, platform):
         m = Module()
 
@@ -147,7 +152,7 @@ class W65C816WishboneBridge(wiring.Component):
         assert tDHR + tADS <= tPWL, "Min clock low time too short"
 
         def ns_to_cycles(ns):
-            return int((ns * platform.target_clk_frequency) / 1000000000)
+            return int((ns * self._target_clk) / 1000000000)
 
         # Note: times of less than 15ns or so need 1 FPGA clock cycle,
         # so they don't have associated counters, and instead just an

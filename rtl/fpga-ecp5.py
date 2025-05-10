@@ -14,8 +14,9 @@ from cpu import W65C816Connector, P65C816SoftCore
 
 
 class FpgaTopLevel(Elaboratable):
-    def __init__(self, *, external_cpu=False, debug_probe=False):
+    def __init__(self, *, target_clk=75e6, external_cpu=False, debug_probe=False):
         super().__init__()
+        self._target_clk = target_clk
         self._external_cpu = external_cpu
         self._debug_probe = debug_probe
 
@@ -30,9 +31,11 @@ class FpgaTopLevel(Elaboratable):
 
         primary_clk = Signal()
 
-        # TODO
-        # platform.add_clock_constraint(cd_sync.clk, 100e6)
+        # TODO: (Bug amaranth-lang/amaranth#1565).
+        # platform.add_clock_constraint(cd_sync.clk, self._target_clk)
 
+        # TODO(qookie): Compute the PLL parameters dynamically?
+        assert self._target_clk == 75e6, 'Adjust PLL parameters for new clock speed'
         m.submodules.pll = Instance(
             "EHXPLLL",
 
@@ -60,7 +63,7 @@ class FpgaTopLevel(Elaboratable):
             i_CLKFB=ClockSignal("sync"),
         )
 
-        m.submodules.top = top = TopLevel()
+        m.submodules.top = top = TopLevel(target_clk=self._target_clk)
 
         if self._debug_probe:
             m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
@@ -111,11 +114,11 @@ def W65C816Resource(*args, clk, rst, addr, data, rwb, vda, vpa, vpb,
 
 
 class PaaliaqPlatform(LatticeECP5Platform):
-    device               = "LFE5U-25F"
-    package              = "BG256"
-    speed                = "7"
-    default_clk          = "clk25"
-    target_clk_frequency = 75000000
+    device      = "LFE5U-25F"
+    package     = "BG256"
+    speed       = "7"
+    default_clk = "clk25"
+
 
     def __init__(self, *, use_abc9=True):
         super().__init__()
