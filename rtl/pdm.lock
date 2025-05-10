@@ -29,10 +29,10 @@ files = [
 
 [[package]]
 name = "amaranth-boards"
-version = "0.1.dev256"
+version = "0.1.dev258"
 requires_python = "~=3.9"
 git = "https://github.com/amaranth-lang/amaranth-boards"
-revision = "6e01882eefd62cf19f5740406144632fe2d21947"
+revision = "c26a72e59c786b38e0e989ae64c6c2560ca7c29c"
 summary = "Board and connector definitions for Amaranth HDL"
 groups = ["default"]
 dependencies = [
@@ -226,14 +226,14 @@ files = [
 
 [[package]]
 name = "yowasp-nextpnr-ecp5"
-version = "0.7.0.0.post519"
+version = "0.8.0.0.post621"
 summary = "nextpnr-ecp5 FPGA place and route tool"
 groups = ["default"]
 dependencies = [
     "yowasp-runtime~=1.1",
 ]
 files = [
-    {file = "yowasp_nextpnr_ecp5-0.7.0.0.post519-py3-none-any.whl", hash = "sha256:0bab40d519525d17bf1b3e5961da1a23594594c2c3b25d404d3d7f95aebbeeef"},
+    {file = "yowasp_nextpnr_ecp5-0.8.0.0.post621-py3-none-any.whl", hash = "sha256:8b8d36cdd1ead15d045b080fe4b9bcecf36a8cecc4300bca11d8f9d3051a541f"},
 ]
 
 [[package]]
@@ -253,7 +253,7 @@ files = [
 
 [[package]]
 name = "yowasp-yosys"
-version = "0.50.0.0.post858"
+version = "0.53.0.0.post912"
 summary = "Yosys Open SYnthesis Suite"
 groups = ["default"]
 dependencies = [
@@ -262,5 +262,5 @@ dependencies = [
     "yowasp-runtime~=1.12",
 ]
 files = [
-    {file = "yowasp_yosys-0.50.0.0.post858-py3-none-any.whl", hash = "sha256:05eb4107600c27146c83244b40afbdcec852d94783c57bc710c063e9e2bc68e2"},
+    {file = "yowasp_yosys-0.53.0.0.post912-py3-none-any.whl", hash = "sha256:681017e3d2fe8db2b5d5845233866ce19eca93d35dbcd5d3a0d0a8c23fcd9413"},
 ]
