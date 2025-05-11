@@ -230,7 +230,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--external-cpu', action='store_true')
     parser.add_argument('--allow-timing-fail', action='store_true')
-    parser.add_argument('--target-clk', type=int)
+    parser.add_argument('--target-clk', type=int, default=75)
 
     args = parser.parse_args()
     # FIXME(qookie): Don't disable ABC9 once it's fixed and doesn't
