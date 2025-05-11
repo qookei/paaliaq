@@ -15,21 +15,21 @@ class SimTopLevel(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.top = top = TopLevel()
+        m.submodules.top = top = TopLevel(target_clk=115200 * 10)
 
-        m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
+        #m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
         #m.d.comb += self.tx.eq(probe.tx)
-        m.d.comb += self.tx.eq(top.uart.tx)
-        m.d.comb += top.uart.rx.eq(1)
+        m.d.comb += self.tx.eq(top.tx)
+        m.d.comb += top.rx.eq(1)
 
         m.d.comb += [
-            self.sdram.ba.eq(top.sdram_ctrl.sdram.ba),
-            self.sdram.a.eq(top.sdram_ctrl.sdram.a),
-            self.sdram.dq_o.eq(top.sdram_ctrl.sdram.dq_o),
-            top.sdram_ctrl.sdram.dq_i.eq(self.sdram.dq_i),
-            self.sdram.we.eq(~top.sdram_ctrl.sdram.we),
-            self.sdram.ras.eq(~top.sdram_ctrl.sdram.ras),
-            self.sdram.cas.eq(~top.sdram_ctrl.sdram.cas),
+            self.sdram.ba.eq(top.sdram.ba),
+            self.sdram.a.eq(top.sdram.a),
+            self.sdram.dq_o.eq(top.sdram.dq_o),
+            top.sdram.dq_i.eq(self.sdram.dq_i),
+            self.sdram.we.eq(~top.sdram.we),
+            self.sdram.ras.eq(~top.sdram.ras),
+            self.sdram.cas.eq(~top.sdram.cas),
             self.sdram_clk.eq(~ClockSignal("sync")),
         ]
 
