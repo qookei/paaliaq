@@ -175,9 +175,10 @@ class PaaliaqPlatform(LatticeECP5Platform):
     default_clk = "clk25"
 
 
-    def __init__(self, *, use_abc9=True):
+    def __init__(self, *, use_abc9=True, allow_timing_fail=False):
         super().__init__()
         self._use_abc9 = use_abc9
+        self._allow_timing_fail = allow_timing_fail
 
 
     resources = [
@@ -219,6 +220,8 @@ class PaaliaqPlatform(LatticeECP5Platform):
         overrides = dict(ecppack_opts="--compress")
         if not self._use_abc9:
             overrides['synth_opts'] = '-noabc9'
+        if self._allow_timing_fail or True:
+            overrides['nextpnr_opts'] = '--timing-allow-fail'
         overrides.update(kwargs)
         return super().toolchain_prepare(fragment, name, **overrides)
 
@@ -226,10 +229,16 @@ class PaaliaqPlatform(LatticeECP5Platform):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--external-cpu', action='store_true')
+    parser.add_argument('--allow-timing-fail', action='store_true')
+    parser.add_argument('--target-clk', type=int)
 
     args = parser.parse_args()
     # FIXME(qookie): Don't disable ABC9 once it's fixed and doesn't
     # croak on the P65C816 soft-core. (Bug YosysHQ/yosys#4249).
-    platform = PaaliaqPlatform(use_abc9=args.external_cpu)
+    platform = PaaliaqPlatform(
+        use_abc9=args.external_cpu,
+        allow_timing_fail=args.allow_timing_fail)
     platform.add_file('65c816.v', open('65c816.v'))
-    platform.build(FpgaTopLevel(external_cpu=args.external_cpu))
+    platform.build(FpgaTopLevel(
+        external_cpu=args.external_cpu,
+        target_clk=args.target_clk * 1e6))
