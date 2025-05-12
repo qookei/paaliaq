@@ -6,7 +6,7 @@ from amaranth.build import *
 from amaranth.vendor import LatticeECP5Platform
 from amaranth_boards.resources import *
 
-from top import TopLevel
+from soc import SoC
 from uart import UARTTransmitter
 from probe import W65C816DebugProbe
 from sdram import SDRAMConnector
@@ -86,7 +86,7 @@ def compute_pll_params(in_clk, out_clk):
     }
 
 
-class FpgaTopLevel(Elaboratable):
+class TopLevel(Elaboratable):
     def __init__(self, *, target_clk=75e6, external_cpu=False, debug_probe=False):
         super().__init__()
         self._target_clk = target_clk
@@ -118,28 +118,28 @@ class FpgaTopLevel(Elaboratable):
             i_CLKFB=ClockSignal("sync"),
         )
 
-        m.submodules.top = top = TopLevel(target_clk=self._target_clk)
+        m.submodules.soc = soc = SoC(target_clk=self._target_clk)
 
         if self._debug_probe:
-            m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
+            m.submodules.probe = probe = W65C816DebugProbe(soc.cpu_bridge)
             uart = platform.request("uart")
             m.d.comb += uart.tx.o.eq(probe.tx)
-            m.d.comb += top.rx.eq(1)
+            m.d.comb += soc.rx.eq(1)
         else:
             uart = platform.request("uart")
             m.d.comb += [
-                uart.tx.o.eq(top.tx),
-                top.rx.eq(uart.rx.i),
+                uart.tx.o.eq(soc.tx),
+                soc.rx.eq(uart.rx.i),
             ]
 
         led = platform.request("led")
         #m.d.comb += led.o.eq(top.timer.irq.i)
 
         m.submodules.sdram = sdram = SDRAMConnector()
-        wiring.connect(m, sdram.sdram, top.sdram)
+        wiring.connect(m, sdram.sdram, soc.sdram)
 
         m.submodules.cpu = cpu = W65C816Connector() if self._external_cpu else P65C816SoftCore()
-        wiring.connect(m, cpu.iface, top.cpu)
+        wiring.connect(m, cpu.iface, soc.cpu)
 
         return m
 
@@ -239,6 +239,6 @@ if __name__ == '__main__':
         use_abc9=args.external_cpu,
         allow_timing_fail=args.allow_timing_fail)
     platform.add_file('65c816.v', open('65c816.v'))
-    platform.build(FpgaTopLevel(
+    platform.build(TopLevel(
         external_cpu=args.external_cpu,
         target_clk=args.target_clk * 1e6))

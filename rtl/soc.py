@@ -129,7 +129,7 @@ def print_memory_map(memory_map, depth=0):
         print(f' - [{resource.start:#010x}, {resource.end:#010x}) - {path}')
 
 
-class TopLevel(wiring.Component):
+class SoC(wiring.Component):
     cpu: In(W65C816BusSignature())
     sdram: Out(SDRAMSignature())
 

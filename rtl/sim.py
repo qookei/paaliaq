@@ -2,12 +2,12 @@ from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from top import TopLevel
+from soc import SoC
 from probe import W65C816DebugProbe
 from sdram import SDRAMSignature
 
 
-class SimTopLevel(wiring.Component):
+class TopLevel(wiring.Component):
     tx: Out(1)
     sdram: Out(SDRAMSignature())
     sdram_clk: Out(1)
@@ -15,21 +15,21 @@ class SimTopLevel(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.top = top = TopLevel(target_clk=115200 * 10)
+        m.submodules.soc = soc = SoC(target_clk=115200 * 10)
 
         #m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
         #m.d.comb += self.tx.eq(probe.tx)
-        m.d.comb += self.tx.eq(top.tx)
-        m.d.comb += top.rx.eq(1)
+        m.d.comb += self.tx.eq(soc.tx)
+        m.d.comb += soc.rx.eq(1)
 
         m.d.comb += [
-            self.sdram.ba.eq(top.sdram.ba),
-            self.sdram.a.eq(top.sdram.a),
-            self.sdram.dq_o.eq(top.sdram.dq_o),
-            top.sdram.dq_i.eq(self.sdram.dq_i),
-            self.sdram.we.eq(~top.sdram.we),
-            self.sdram.ras.eq(~top.sdram.ras),
-            self.sdram.cas.eq(~top.sdram.cas),
+            self.sdram.ba.eq(soc.sdram.ba),
+            self.sdram.a.eq(soc.sdram.a),
+            self.sdram.dq_o.eq(soc.sdram.dq_o),
+            soc.sdram.dq_i.eq(self.sdram.dq_i),
+            self.sdram.we.eq(~soc.sdram.we),
+            self.sdram.ras.eq(~soc.sdram.ras),
+            self.sdram.cas.eq(~soc.sdram.cas),
             self.sdram_clk.eq(~ClockSignal("sync")),
         ]
 
@@ -44,7 +44,7 @@ if __name__ == '__main__':
         target_clk_frequency = 115200 * 10
 
     with open("sim_top.v", "w") as f:
-        top = SimTopLevel()
+        top = TopLevel()
         f.write(verilog.convert(top, platform=SimPlatform(), ports=[
             top.tx,
             top.sdram_clk,
