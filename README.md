@@ -1,34 +1,40 @@
 # Paaliaq
 
-Paaliaq is a WDC W65C816-based single board computer with support for
-some modern features such as address translation, and kernel/user
-priviledge separation.
+Paaliaq is a WDC W65C816-based single board computer and the
+accompanying software, with support for e.g. modern memory management
+features, and kernel/user priviledge separation.
 
-## (Planned) Specifications
+The project is currently in early stages of development, with most of
+the current work focusing on the chipset implemntation. Proper
+documentation TBD.
 
- - CPU: WDC W65C816 @ 8MHz
- - RAM: 2 MiB of SRAM
- - FPGA: Lattice Semi. iCE40 HX1K
- - Storage: 2 MiB SPI flash chip, used for storing the FPGA bitstream,
-   boot code, and a file system.
- - Expansion ports: 3 UART interfaces, a SPI interface (shared with
-   aformentioned flash chip), 8 GPIOs.
+## Specifications
+
+Using the Colorlight 5A-75B (v8.2 specifically) with the following
+specifications as the base FPGA board:
+
+ - Lattice ECP5 LFE5U-25F FPGA
+ - 8MiB of SDR SDRAM
+ - 4MiB SPI flash (holding the bitstream, with free space after it)
+ - 2x GbE PHYs (unused for now, plans for use include debug interface
+   and a NIC)
+
+The project is currently using a soft-core 65C816 implementation, with
+future plans for a daughterboard holding an actual 65C816 chip, and
+breaking out various IO interfaces (UARTs, GPIO, etc).
 
 ## How?
 
-Supporting these features is made possible due to the inclusion of the
-`ABORTB` signal on the W65C816 CPU, which allows the currently
-executing instruction to be aborted, which prevents register content
-changes, and allows the instruction to potentially be retried after a
-return from the handler (for example to allow the implementation of
-on-demand paging, swapping pages out, etc.).
+Supporting the features mentioned above is made possible due to the
+inclusion of the `ABORTB` signal on the 65C816 CPU, which allows the
+currently executing instruction to be aborted, preventing register
+changes and memory reads/writes, and allowing the instruction to
+potentially be retried after returning from the handler.
 
-Additionally, to help implement this, in place of a traditional set of
-peripherals and logic chips one might expect, an FPGA is used to act as
-an all-encompasing chipset, which implements all of the system
-peripherals (such as timers, UARTs, SPI, etc.), the MMU, which performs
-address translation, and an internal interconnect which routes accesses
-to external RAM or other parts of the chip.
+To facilitate this, the FPGA contains not only the memory controller
+and various peripherals, but also a page-based memory management unit,
+which performs address translation and permission checks, signaling
+errors to the CPU via the aforementioned abort signal.
 
 ## Directory structure and building
 
