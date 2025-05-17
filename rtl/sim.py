@@ -3,6 +3,7 @@ from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
 from soc import SoC
+from cpu import P65C816SoftCore
 from probe import W65C816DebugProbe
 from sdram import SDRAMSignature
 
@@ -16,6 +17,9 @@ class TopLevel(wiring.Component):
         m = Module()
 
         m.submodules.soc = soc = SoC(target_clk=115200 * 10)
+
+        m.submodules.cpu = cpu = P65C816SoftCore()
+        wiring.connect(m, cpu.iface, soc.cpu)
 
         #m.submodules.probe = probe = W65C816DebugProbe(top.cpu_bridge)
         #m.d.comb += self.tx.eq(probe.tx)
