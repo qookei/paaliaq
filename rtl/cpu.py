@@ -8,8 +8,6 @@ from mmu import MMUSignature
 class W65C816BusSignature(wiring.Signature):
     def __init__(self):
         super().__init__({
-            # TODO(qookie): We probably should instead create a new
-            # ClockDomain?
             'clk': In(1),
             'rst': In(1),
             # Address bus. (addr_hi is only valid during a part of the
@@ -111,8 +109,8 @@ class W65C816WishboneBridge(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        #     1   2  3       4    5         1
-        #     |   |  |       |    |         |
+        #     1   2  3     4 5    6         1
+        #     |   |  |     | |    |         |
         # ____                ______________
         #     \______________/              \____
         # 1) We bring the CPU clock down, after which, if the CPU is reading, it will
@@ -126,16 +124,13 @@ class W65C816WishboneBridge(wiring.Component):
         #    figure out the state for ABORT.
         #    Address translation may take more than we have time (at 8MHz), in which
         #    case we delay the entry to state 4, stretching the clock.
-        # 4) We bring the CPU clock up, after which the CPU will probe ABORT.
-        # -) After point 4, we can initiate a read transaction if the CPU is reading.
+        # 4) At this point we wait for any ongoing write transaction to complete.
+        # 5) We bring the CPU clock up, after which the CPU will probe ABORT.
+        # -) After point 5, we initiate a read transaction if the CPU is reading.
         #    We need to wait for a minimum amount of cycles, after which we stretch
         #    the clock until it completes before going back to point 1.
         # 5) If writing, the CPU outputs the write data on the data bus at this point.
-        #    We can initiate the write transaction here.
-        #    In theory, we could let the write transaction run until point 4 of the
-        #    next clock cycle before we have to block (and even longer if the next
-        #    cycle is a no-op [VDA=VPA=0]), but for simplicity, the read & write paths
-        #    will converge on blocking before point 1 is reached.
+        #    We initiate the write transaction here.
         # Timings for the various points (at 8MHz @ 3.3V):
         #  1 -> 2) tDHW & tDHR: min 10 ns (upper bound up to 1 -> 3 time)
         #  1 -> 3) tADS & tBAS: max 40 ns
@@ -168,9 +163,17 @@ class W65C816WishboneBridge(wiring.Component):
         w_data_valid_ctr = Signal(range(clks_w_data_valid + 1))
         print(f'Will wait for w_data for {clks_w_data_valid} clocks')
 
-        clks_wait_high = ns_to_cycles(tPWH - tMDS)
-        wait_high_ctr = Signal(range(clks_wait_high + 1))
-        print(f'Will wait high for {clks_wait_high} clocks')
+        clks_wait_noop = ns_to_cycles(tPWH)
+        wait_noop_ctr = Signal(range(clks_wait_noop + 1))
+        print(f'No-op cycles will wait for {clks_wait_noop} clocks')
+
+        clks_wait_read = ns_to_cycles(tPWH)
+        wait_read_ctr = Signal(range(clks_wait_read + 1))
+        print(f'Read cycles will wait for {clks_wait_read} clocks')
+
+        clks_wait_write = ns_to_cycles(tPWH - tMDS)
+        wait_write_ctr = Signal(range(clks_wait_write + 1))
+        print(f'Write cycles will wait for {clks_wait_write} clocks')
 
         clks_rst_low = ns_to_cycles(tPWL)
         rst_low_ctr = Signal(range(clks_rst_low + 1))
@@ -200,6 +203,21 @@ class W65C816WishboneBridge(wiring.Component):
             self.pmc.clks.eq(clk_ctr),
             self.pmc.insns.eq(insn_ctr),
         ]
+
+        read_in_progress = Signal()
+        write_in_progress = Signal()
+
+        with m.If(self.wb_bus.cyc & self.wb_bus.ack):
+            m.d.sync += [
+                read_in_progress.eq(0),
+                write_in_progress.eq(0),
+                self.wb_bus.cyc.eq(0),
+            ]
+            with m.If(read_in_progress):
+                m.d.sync += [
+                    self.cpu.r_data.eq(self.wb_bus.dat_r),
+                    self.cpu.r_data_en.eq(1),
+                ]
 
         with m.FSM():
             with m.State('rst-clk-low'):
@@ -246,56 +264,57 @@ class W65C816WishboneBridge(wiring.Component):
                 m.next = 'mmu-stb-lo'
             with m.State('mmu-stb-lo'):
                 m.d.sync += self.mmu.stb.eq(0)
-                m.next = 'clk-rising-edge'
+
+                with m.If(write_in_progress):
+                    m.next = 'mmu-stb-lo'
+                with m.Else():
+                    m.next = 'clk-rising-edge'
             with m.State('clk-rising-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(1),
-                    w_data_valid_ctr.eq(0)
+                    self.wb_bus.adr.eq(self.mmu.paddr),
                 ]
-                m.next = 'initiate-transaction'
-            with m.State('initiate-transaction'):
+                with m.If(~((self.cpu.vda | self.cpu.vpa) & self.cpu.abort)):
+                    m.d.sync += wait_noop_ctr.eq(0)
+                    m.next = 'noop-cycle'
+                with m.Elif(self.cpu.rw):
+                    m.next = 'initiate-read'
+                with m.Else():
+                    m.d.sync += w_data_valid_ctr.eq(0)
+                    m.next = 'initiate-write'
+
+            with m.State('noop-cycle'):
+                m.d.sync += wait_noop_ctr.eq(wait_noop_ctr + 1)
+                with m.If(wait_noop_ctr >= clks_wait_noop):
+                    m.next = 'clk-falling-edge'
+
+            with m.State('initiate-read'):
+                m.d.sync += [
+                    wait_read_ctr.eq(0),
+                    read_in_progress.eq(1),
+                    self.wb_bus.cyc.eq(1),
+                    self.wb_bus.we.eq(0),
+                ]
+                m.next = 'complete-read'
+            with m.State('complete-read'):
+                m.d.sync += wait_read_ctr.eq(wait_read_ctr + 1)
+                with m.If(~read_in_progress & (wait_read_ctr >= clks_wait_read)):
+                    m.next = 'clk-falling-edge'
+
+            with m.State('initiate-write'):
                 m.d.sync += w_data_valid_ctr.eq(w_data_valid_ctr + 1)
                 with m.If(w_data_valid_ctr == clks_w_data_valid):
-                    # XXX: Is this right?
                     m.d.sync += [
-                        self.wb_bus.adr.eq(self.mmu.paddr),
-                        self.wb_bus.cyc.eq((self.cpu.vda | self.cpu.vpa) & self.cpu.abort),
-                        self.wb_bus.we.eq(~self.cpu.rw),
+                        write_in_progress.eq(1),
+                        wait_write_ctr.eq(0),
+                        self.wb_bus.cyc.eq(1),
+                        self.wb_bus.we.eq(1),
                         self.wb_bus.dat_w.eq(self.cpu.w_data),
-                        wait_high_ctr.eq(0)
                     ]
-                    m.next = 'complete-transaction'
-            with m.State('complete-transaction'):
-                m.d.sync += wait_high_ctr.eq(wait_high_ctr + 1)
-                with m.If(~self.wb_bus.cyc): # No-op cycle
-                    m.next = 'wait-high'
-
-                    m.d.sync += self.debug_trigger.eq(1)
-                with m.Elif(self.wb_bus.ack): # Access complete
-                    m.next = 'wait-high'
-
-                    m.d.sync += self.wb_bus.cyc.eq(0)
-                    m.d.sync += self.debug_trigger.eq(1)
-
-                    with m.If(self.cpu.rw):
-                        m.d.sync += [
-                            self.cpu.r_data.eq(self.wb_bus.dat_r),
-                            self.cpu.r_data_en.eq(1)
-                        ]
-                with m.Else():
-                    # Access still in progress
-                    # FIXME: Add a timeout? If no one responds to our bus transaction,
-                    # we get stuck here...
-
-                    # Bug amaranth-lang/amaranth-soc#38 talks about
-                    # making the Wishbone decoder assert ERR for
-                    # unmapped addresses...
-                    pass
-            with m.State('wait-high'):
-                m.d.sync += wait_high_ctr.eq(wait_high_ctr + 1)
-                # Wait for some time before taking the clock low.
-                m.d.sync += self.debug_trigger.eq(0)
-                with m.If(wait_high_ctr >= clks_wait_high):
+                    m.next = 'complete-write'
+            with m.State('complete-write'):
+                m.d.sync += wait_write_ctr.eq(wait_write_ctr + 1)
+                with m.If(wait_write_ctr == clks_wait_write):
                     m.next = 'clk-falling-edge'
 
         return m
