@@ -285,7 +285,7 @@ class W65C816WishboneBridge(wiring.Component):
 
             with m.State('noop-cycle'):
                 m.d.sync += wait_noop_ctr.eq(wait_noop_ctr + 1)
-                with m.If(wait_noop_ctr >= clks_wait_noop):
+                with m.If(wait_noop_ctr == clks_wait_noop):
                     m.next = 'clk-falling-edge'
 
             with m.State('initiate-read'):
@@ -297,8 +297,9 @@ class W65C816WishboneBridge(wiring.Component):
                 ]
                 m.next = 'complete-read'
             with m.State('complete-read'):
-                m.d.sync += wait_read_ctr.eq(wait_read_ctr + 1)
-                with m.If(~read_in_progress & (wait_read_ctr >= clks_wait_read)):
+                with m.If(wait_read_ctr != clks_wait_read):
+                    m.d.sync += wait_read_ctr.eq(wait_read_ctr + 1)
+                with m.Elif(~read_in_progress):
                     m.next = 'clk-falling-edge'
 
             with m.State('initiate-write'):
