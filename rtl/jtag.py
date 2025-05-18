@@ -1,5 +1,5 @@
 from amaranth import *
-from amaranth.lib import wiring
+from amaranth.lib import wiring, cdc
 from amaranth.lib.fifo import AsyncFIFOBuffered
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import wishbone
