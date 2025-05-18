@@ -119,6 +119,14 @@ class JTAGG(wiring.Component):
         return m
 
 
+# A JTAG debug probe providing remote access to the system bus. Has a
+# relatively simple interface:
+#
+# Host always sends 5 bytes: command, 24 bit address, write data.
+# Target always responds with 1 byte: read data.
+#
+# For reads, write data is ignored, for writes, read data has an
+# unspecified value. All accesses have their associated side effects.
 class JTAGDebugProbe(wiring.Component):
     wb_bus: Out(wishbone.Signature(addr_width=24, data_width=8))
 
@@ -127,14 +135,59 @@ class JTAGDebugProbe(wiring.Component):
 
         m.submodules.jtagg = jtagg = JTAGG()
 
-        with m.If(jtagg.rx_rdy & ~jtagg.tx_stb):
-            m.d.sync += jtagg.tx_data.eq(jtagg.rx_data)
-            m.d.sync += jtagg.rx_stb.eq(1)
-            m.d.sync += jtagg.tx_stb.eq(1)
-        with m.Else():
-            m.d.sync += jtagg.rx_stb.eq(0)
-            m.d.sync += jtagg.tx_stb.eq(0)
+        # Since our data bus is only 8 bits wide, SEL_O is just always 1.
+        m.d.comb += self.wb_bus.sel.eq(1)
+        # Bus is held only for the duration of the command.
+        m.d.comb += self.wb_bus.stb.eq(self.wb_bus.cyc)
 
-        # TODO: Actual read/write commands over JTAG
+        cmd = Signal(8)
+        addr = Signal(24)
+        r_data, w_data = Signal(8), Signal(8)
+
+        m.d.sync += jtagg.tx_stb.eq(0)
+        m.d.sync += jtagg.rx_stb.eq(0)
+
+        with m.FSM():
+            def rx_state(state, to_state, dest):
+                with m.State(state):
+                    with m.If(jtagg.rx_rdy):
+                        m.d.sync += [
+                            dest.eq(jtagg.rx_data),
+                            jtagg.rx_stb.eq(1),
+                        ]
+                        m.next = state + "-clr-stb"
+                with m.State(state + "-clr-stb"):
+                    m.next = to_state
+
+            rx_state("recv-cmd", "recv-addr0", cmd)
+            rx_state("recv-addr0", "recv-addr1", addr.bit_select(0, 8))
+            rx_state("recv-addr1", "recv-addr2", addr.bit_select(8, 8))
+            rx_state("recv-addr2", "recv-w-data", addr.bit_select(16, 8))
+            rx_state("recv-w-data", "transaction", w_data)
+
+            with m.State("transaction"):
+                with m.If(~self.wb_bus.cyc):
+                    # Not yet started.
+                    m.d.sync += [
+                        self.wb_bus.adr.eq(addr),
+                        self.wb_bus.dat_w.eq(w_data),
+                        self.wb_bus.cyc.eq(1),
+                        self.wb_bus.we.eq(cmd == ord('w')),
+                    ]
+                with m.Elif(self.wb_bus.ack):
+                    # Completed.
+                    m.d.sync += [
+                        self.wb_bus.cyc.eq(0),
+                        r_data.eq(self.wb_bus.dat_r),
+                    ]
+                    m.next = "send-r-data"
+
+            with m.State("send-r-data"):
+                with m.If(jtagg.tx_rdy):
+                    m.d.sync += [
+                        jtagg.tx_data.eq(r_data),
+                        jtagg.tx_stb.eq(1),
+                    ]
+                    m.next = "recv-cmd"
 
         return m
