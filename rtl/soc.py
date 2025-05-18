@@ -8,6 +8,7 @@ from amaranth.lib.wiring import In, Out
 
 from cpu import W65C816BusSignature, PMCSignature, W65C816WishboneBridge
 
+from jtag import JTAGDebugProbe
 
 from uart import UARTPeripheral
 
@@ -148,7 +149,13 @@ class SoC(wiring.Component):
         m = Module()
         evt_map = event.EventMap()
 
+        m.submodules.wb_arb = wb_arb = wishbone.Arbiter(addr_width=24, data_width=8)
+
         m.submodules.cpu_bridge = self.cpu_bridge
+        wb_arb.add(self.cpu_bridge.wb_bus)
+
+        m.submodules.jtag_debug = jtag_debug = JTAGDebugProbe()
+        wb_arb.add(jtag_debug.wb_bus)
 
         m.submodules.wb_dec = wb_dec = wishbone.Decoder(addr_width=24, data_width=8)
 
@@ -190,8 +197,9 @@ class SoC(wiring.Component):
 
         print_memory_map(wb_dec.bus.memory_map)
 
+        wiring.connect(m, wb_arb.bus, wb_dec.bus)
+
         wiring.connect(m, self.cpu_bridge.cpu, wiring.flipped(self.cpu))
         wiring.connect(m, self.cpu_bridge.irq, evt_monitor.src)
-        wiring.connect(m, self.cpu_bridge.wb_bus, wb_dec.bus)
 
         return m
