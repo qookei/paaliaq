@@ -1,11 +1,12 @@
 proc tx {v} {
     irscan ecp5.tap 0x38
     drscan ecp5.tap 8 $v
+    return {}
 }
 
 proc rx {} {
     irscan ecp5.tap 0x32
-    return [drscan ecp5.tap 8 0]
+    return 0x[drscan ecp5.tap 8 0]
 }
 
 proc poke {addr val} {
@@ -15,6 +16,7 @@ proc poke {addr val} {
     tx [expr {($addr >> 16) & 0xFF}]
     tx $val
     rx
+    return {}
 }
 
 proc peek {addr} {
