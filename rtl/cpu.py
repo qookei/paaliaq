@@ -1,7 +1,7 @@
 from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
-from amaranth_soc import wishbone, event
+from amaranth_soc import wishbone, event, csr
 
 from mmu import MMUSignature
 
@@ -56,14 +56,6 @@ class W65C816Connector(wiring.Component):
         return m
 
 
-class PMCSignature(wiring.Signature):
-    def __init__(self):
-        super().__init__({
-            'clks': Out(32),
-            'insns': Out(32),
-        })
-
-
 class P65C816SoftCore(wiring.Component):
     iface: Out(W65C816BusSignature())
 
@@ -94,20 +86,36 @@ class P65C816SoftCore(wiring.Component):
 
 class W65C816WishboneBridge(wiring.Component):
     cpu: In(W65C816BusSignature())
-    wb_bus: Out(wishbone.Signature(addr_width=24, data_width=8))
-    debug_trigger: Out(1)
     irq: In(event.Source().signature)
     mmu: In(MMUSignature())
-    pmc: Out(PMCSignature())
+
+    wb_bus: Out(wishbone.Signature(addr_width=24, data_width=8))
+    csr_bus: In(csr.Signature(addr_width=4, data_width=8))
+
+
+    class CounterRegister(csr.Register, access="r"):
+        value: csr.Field(csr.action.R, 32)
 
 
     def __init__(self, *, target_clk):
         super().__init__()
         self._target_clk = target_clk
 
+        regs = csr.Builder(addr_width=4, data_width=8)
+
+        self._clks = regs.add("Clks", self.CounterRegister())
+        self._insns = regs.add("Insns", self.CounterRegister())
+
+        mmap = regs.as_memory_map()
+        self._bridge = csr.Bridge(mmap)
+        self.csr_bus.memory_map = mmap
+
 
     def elaborate(self, platform):
         m = Module()
+
+        m.submodules.bridge = self._bridge
+        wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         #     1   2  3     4 5    6         1
         #     |   |  |     | |    |         |
@@ -200,8 +208,8 @@ class W65C816WishboneBridge(wiring.Component):
         insn_ctr = Signal(32)
 
         m.d.comb += [
-            self.pmc.clks.eq(clk_ctr),
-            self.pmc.insns.eq(insn_ctr),
+            self._clks.f.value.r_data.eq(clk_ctr),
+            self._insns.f.value.r_data.eq(insn_ctr),
         ]
 
         read_in_progress = Signal()
