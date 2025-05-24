@@ -106,10 +106,7 @@ class SoC(wiring.Component):
 
     def __init__(self, *, target_clk):
         super().__init__()
-
         self._target_clk = target_clk
-        # TODO(qookie): This can be moved below after some refactoring.
-        self.cpu_bridge = W65C816WishboneBridge(target_clk=target_clk)
 
 
     def elaborate(self, platform):
@@ -118,8 +115,8 @@ class SoC(wiring.Component):
 
         m.submodules.wb_arb = wb_arb = wishbone.Arbiter(addr_width=24, data_width=8)
 
-        m.submodules.cpu_bridge = self.cpu_bridge
-        wb_arb.add(self.cpu_bridge.wb_bus)
+        m.submodules.cpu_bridge = cpu_bridge = W65C816WishboneBridge(target_clk=self._target_clk)
+        wb_arb.add(cpu_bridge.wb_bus)
 
         m.submodules.jtag_debug = jtag_debug = JTAGDebugProbe()
         wb_arb.add(jtag_debug.wb_bus)
@@ -152,9 +149,9 @@ class SoC(wiring.Component):
 
         m.submodules.mmu = mmu = MMU()
         csr_dec.add(mmu.bus, name='mmu')
-        wiring.connect(m, self.cpu_bridge.mmu, mmu.iface)
+        wiring.connect(m, cpu_bridge.mmu, mmu.iface)
 
-        csr_dec.add(self.cpu_bridge.csr_bus, name='pmc')
+        csr_dec.add(cpu_bridge.csr_bus, name='dbg')
 
         # This freezes the CSR memory map.
         m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)
@@ -164,7 +161,7 @@ class SoC(wiring.Component):
 
         wiring.connect(m, wb_arb.bus, wb_dec.bus)
 
-        wiring.connect(m, self.cpu_bridge.cpu, wiring.flipped(self.cpu))
-        wiring.connect(m, self.cpu_bridge.irq, evt_monitor.src)
+        wiring.connect(m, cpu_bridge.cpu, wiring.flipped(self.cpu))
+        wiring.connect(m, cpu_bridge.irq, evt_monitor.src)
 
         return m

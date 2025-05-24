@@ -7,8 +7,6 @@ from amaranth.vendor import LatticeECP5Platform
 from amaranth_boards.resources import *
 
 from soc import SoC
-from uart import UARTTransmitter
-from probe import W65C816DebugProbe
 from sdram import SDRAMConnector
 from cpu import W65C816Connector, P65C816SoftCore
 
@@ -87,11 +85,10 @@ def compute_pll_params(in_clk, out_clk):
 
 
 class TopLevel(Elaboratable):
-    def __init__(self, *, target_clk=75e6, external_cpu=False, debug_probe=False):
+    def __init__(self, *, target_clk=75e6, external_cpu=False):
         super().__init__()
         self._target_clk = target_clk
         self._external_cpu = external_cpu
-        self._debug_probe = debug_probe
 
     def elaborate(self, platform):
         m = Module()
@@ -120,17 +117,11 @@ class TopLevel(Elaboratable):
 
         m.submodules.soc = soc = SoC(target_clk=self._target_clk)
 
-        if self._debug_probe:
-            m.submodules.probe = probe = W65C816DebugProbe(soc.cpu_bridge)
-            uart = platform.request("uart")
-            m.d.comb += uart.tx.o.eq(probe.tx)
-            m.d.comb += soc.rx.eq(1)
-        else:
-            uart = platform.request("uart")
-            m.d.comb += [
-                uart.tx.o.eq(soc.tx),
-                soc.rx.eq(uart.rx.i),
-            ]
+        uart = platform.request("uart")
+        m.d.comb += [
+            uart.tx.o.eq(soc.tx),
+            soc.rx.eq(uart.rx.i),
+        ]
 
         led = platform.request("led")
         #m.d.comb += led.o.eq(top.timer.irq.i)
