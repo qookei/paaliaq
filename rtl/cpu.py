@@ -90,21 +90,50 @@ class W65C816WishboneBridge(wiring.Component):
     mmu: In(MMUSignature())
 
     wb_bus: Out(wishbone.Signature(addr_width=24, data_width=8))
-    csr_bus: In(csr.Signature(addr_width=4, data_width=8))
+    csr_bus: In(csr.Signature(addr_width=5, data_width=8))
 
 
     class CounterRegister(csr.Register, access="r"):
         value: csr.Field(csr.action.R, 32)
+
+    class DbgConfigRegister(csr.Register, access="rw"):
+        dbg_enable: csr.Field(csr.action.RW1C, 1)
+        dbg_en_next_insn: csr.Field(csr.action.RW1S, 1)
+        trace_enable: csr.Field(csr.action.RW, 1)
+        trace_halted: csr.Field(csr.action.RW1C, 1)
+        _unused: csr.Field(csr.action.ResR0WA, 4)
+
+    class InDataRegister(csr.Register, access="w"):
+        data: csr.Field(csr.action.W, 8)
+    class OutDataRegister(csr.Register, access="r"):
+        data: csr.Field(csr.action.R, 8)
+
+    class DbgAddrRegister(csr.Register, access="r"):
+        addr: csr.Field(csr.action.R, 24)
+
+    class DbgBusRegister(csr.Register, access="r"):
+        vpa: csr.Field(csr.action.R, 1)
+        vda: csr.Field(csr.action.R, 1)
+        vpb: csr.Field(csr.action.R, 1)
+        rwb: csr.Field(csr.action.R, 1)
+        _unused: csr.Field(csr.action.ResR0WA, 4)
 
 
     def __init__(self, *, target_clk):
         super().__init__()
         self._target_clk = target_clk
 
-        regs = csr.Builder(addr_width=4, data_width=8)
+        regs = csr.Builder(addr_width=5, data_width=8)
 
         self._clks = regs.add("Clks", self.CounterRegister())
         self._insns = regs.add("Insns", self.CounterRegister())
+        self._dbg_config = regs.add("DbgConfig", self.DbgConfigRegister())
+        self._dbg_bus = regs.add("DbgBus", self.DbgBusRegister())
+        self._dbg_rdata = regs.add("DbgRData", self.InDataRegister())
+        self._dbg_vaddr = regs.add("DbgVAddr", self.DbgAddrRegister())
+        self._dbg_wdata = regs.add("DbgWData", self.OutDataRegister())
+        self._dbg_trace_rdata = regs.add("DbgTrcRData", self.OutDataRegister())
+        self._dbg_paddr = regs.add("DbgPAddr", self.DbgAddrRegister())
 
         mmap = regs.as_memory_map()
         self._bridge = csr.Bridge(mmap)
@@ -215,6 +244,10 @@ class W65C816WishboneBridge(wiring.Component):
         read_in_progress = Signal()
         write_in_progress = Signal()
 
+        dbg_en = self._dbg_config.f.dbg_enable.data
+        trace_en = self._dbg_config.f.trace_enable.data
+        trace_halted = self._dbg_config.f.trace_halted.data
+
         with m.If(self.wb_bus.cyc & self.wb_bus.ack):
             m.d.sync += [
                 read_in_progress.eq(0),
@@ -225,7 +258,19 @@ class W65C816WishboneBridge(wiring.Component):
                 m.d.sync += [
                     self.cpu.r_data.eq(self.wb_bus.dat_r),
                     self.cpu.r_data_en.eq(1),
+                    self._dbg_trace_rdata.f.data.r_data.eq(self.wb_bus.dat_r),
                 ]
+
+        with m.If(dbg_en & self._dbg_rdata.f.data.w_stb):
+            m.d.sync += [
+                read_in_progress.eq(0),
+                self.cpu.r_data.eq(self._dbg_rdata.f.data.w_data),
+                self.cpu.r_data_en.eq(1),
+            ]
+
+        m.d.comb += self._dbg_wdata.f.data.r_data.eq(self.cpu.w_data)
+        with m.If(dbg_en & self._dbg_wdata.f.data.r_stb):
+            m.d.sync += write_in_progress.eq(0)
 
         with m.FSM():
             with m.State('rst-clk-low'):
@@ -260,12 +305,23 @@ class W65C816WishboneBridge(wiring.Component):
                 m.d.sync += latch_addr_ctr.eq(latch_addr_ctr + 1)
                 with m.If(latch_addr_ctr == clks_latch_addr):
                     m.d.sync += [
+                        self._dbg_vaddr.f.addr.r_data.eq(Cat(self.cpu.addr_lo, self.cpu.addr_hi)),
+                        self._dbg_bus.f.vpa.r_data.eq(self.cpu.vpa),
+                        self._dbg_bus.f.vda.r_data.eq(self.cpu.vda),
+                        self._dbg_bus.f.vpb.r_data.eq(self.cpu.vpb),
+                        self._dbg_bus.f.rwb.r_data.eq(self.cpu.rw),
+
                         self.mmu.vaddr.eq(Cat(self.cpu.addr_lo, self.cpu.addr_hi)),
                         self.mmu.write.eq(~self.cpu.rw),
                         self.mmu.ifetch.eq(self.cpu.vpa),
                     ]
                     with m.If(self.cpu.vpa & self.cpu.vda):
                         m.d.sync += insn_ctr.eq(insn_ctr + 1)
+                        with m.If(self._dbg_config.f.dbg_en_next_insn.data):
+                            m.d.comb += [
+                                self._dbg_config.f.dbg_enable.set.eq(1),
+                                self._dbg_config.f.dbg_en_next_insn.clear.eq(1),
+                            ]
                     m.next = 'mmu-stb-hi'
             with m.State('mmu-stb-hi'):
                 m.d.sync += self.mmu.stb.eq(self.cpu.vda | self.cpu.vpa)
@@ -276,13 +332,17 @@ class W65C816WishboneBridge(wiring.Component):
                 with m.If(write_in_progress):
                     m.next = 'mmu-stb-lo'
                 with m.Else():
+                    m.d.comb += self._dbg_config.f.trace_halted.set.eq(1)
                     m.next = 'clk-rising-edge'
             with m.State('clk-rising-edge'):
                 m.d.sync += [
                     self.cpu.clk.eq(1),
                     self.wb_bus.adr.eq(self.mmu.paddr),
+                    self._dbg_paddr.f.addr.r_data.eq(self.mmu.paddr),
                 ]
-                with m.If(~((self.cpu.vda | self.cpu.vpa) & self.cpu.abort)):
+                with m.If(trace_en & trace_halted):
+                    pass
+                with m.Elif(~((self.cpu.vda | self.cpu.vpa) & self.cpu.abort)):
                     m.d.sync += wait_noop_ctr.eq(0)
                     m.next = 'noop-cycle'
                 with m.Elif(self.cpu.rw):
@@ -300,7 +360,7 @@ class W65C816WishboneBridge(wiring.Component):
                 m.d.sync += [
                     wait_read_ctr.eq(0),
                     read_in_progress.eq(1),
-                    self.wb_bus.cyc.eq(1),
+                    self.wb_bus.cyc.eq(~dbg_en),
                     self.wb_bus.we.eq(0),
                 ]
                 m.next = 'complete-read'
@@ -311,12 +371,13 @@ class W65C816WishboneBridge(wiring.Component):
                     m.next = 'clk-falling-edge'
 
             with m.State('initiate-write'):
-                m.d.sync += w_data_valid_ctr.eq(w_data_valid_ctr + 1)
-                with m.If(w_data_valid_ctr == clks_w_data_valid):
+                with m.If(w_data_valid_ctr != clks_w_data_valid):
+                    m.d.sync += w_data_valid_ctr.eq(w_data_valid_ctr + 1)
+                with m.Elif(w_data_valid_ctr == clks_w_data_valid):
                     m.d.sync += [
                         write_in_progress.eq(1),
                         wait_write_ctr.eq(0),
-                        self.wb_bus.cyc.eq(1),
+                        self.wb_bus.cyc.eq(~dbg_en),
                         self.wb_bus.we.eq(1),
                         self.wb_bus.dat_w.eq(self.cpu.w_data),
                     ]
