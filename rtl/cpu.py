@@ -248,6 +248,8 @@ class W65C816WishboneBridge(wiring.Component):
         trace_en = self._dbg_config.f.trace_enable.data
         trace_halted = self._dbg_config.f.trace_halted.data
 
+        dbg_this_cycle = Signal()
+
         with m.If(self.wb_bus.cyc & self.wb_bus.ack):
             m.d.sync += [
                 read_in_progress.eq(0),
@@ -261,15 +263,14 @@ class W65C816WishboneBridge(wiring.Component):
                     self._dbg_trace_rdata.f.data.r_data.eq(self.wb_bus.dat_r),
                 ]
 
-        with m.If(dbg_en & self._dbg_rdata.f.data.w_stb):
+        with m.If(dbg_this_cycle & self._dbg_rdata.f.data.w_stb):
             m.d.sync += [
                 read_in_progress.eq(0),
                 self.cpu.r_data.eq(self._dbg_rdata.f.data.w_data),
                 self.cpu.r_data_en.eq(1),
             ]
 
-        m.d.comb += self._dbg_wdata.f.data.r_data.eq(self.cpu.w_data)
-        with m.If(dbg_en & self._dbg_wdata.f.data.r_stb):
+        with m.If(dbg_this_cycle & self._dbg_wdata.f.data.r_stb):
             m.d.sync += write_in_progress.eq(0)
 
         with m.FSM():
@@ -339,6 +340,7 @@ class W65C816WishboneBridge(wiring.Component):
                     self.cpu.clk.eq(1),
                     self.wb_bus.adr.eq(self.mmu.paddr),
                     self._dbg_paddr.f.addr.r_data.eq(self.mmu.paddr),
+                    dbg_this_cycle.eq(dbg_en),
                 ]
                 with m.If(trace_en & trace_halted):
                     pass
@@ -380,6 +382,7 @@ class W65C816WishboneBridge(wiring.Component):
                         self.wb_bus.cyc.eq(~dbg_en),
                         self.wb_bus.we.eq(1),
                         self.wb_bus.dat_w.eq(self.cpu.w_data),
+                        self._dbg_wdata.f.data.r_data.eq(self.cpu.w_data),
                     ]
                     m.next = 'complete-write'
             with m.State('complete-write'):
