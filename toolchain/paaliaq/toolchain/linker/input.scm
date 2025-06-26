@@ -1,5 +1,6 @@
 (define-module (paaliaq toolchain linker input)
   #:use-module (paaliaq toolchain elf read)
+  #:use-module (paaliaq toolchain elf util)
   #:use-module (paaliaq toolchain elf defines)
   #:use-module (paaliaq toolchain elf format)
 
@@ -123,22 +124,6 @@
 
 ;; -----------------------------------------------------------------------------
 
-(define (%offset-relocs offset relocs)
-  (map
-   (λ (reloc)
-     (set-field reloc
-		(elf-reloc-offset)
-		(+ (elf-reloc-offset reloc) offset)))
-   relocs))
-
-(define (%offset-symbols offset symbols)
-  (map
-   (λ (sym)
-     (set-field sym
-		(elf-symbol-offset)
-		(+ (elf-symbol-offset sym) offset)))
-   symbols))
-
 (define (%build-output-section  out-name . in-sections)
   (let next ([input-scns in-sections]
 	     [flags 0]
@@ -171,8 +156,8 @@
 		(or has-bits (equal? (elf-scn-type scn) SHT_PROGBITS))
 		(max max-align (elf-scn-addralign scn))
 		new-data
-		(append relocs (%offset-relocs offset (elf-scn-relocs scn)))
-		(append symbols (%offset-symbols offset (elf-scn-syms scn))))))))
+		(append relocs (offset-relocations offset (elf-scn-relocs scn)))
+		(append symbols (offset-symbols offset (elf-scn-syms scn))))))))
 
 (define (build-output-sections output-groupings)
   (map (λ (x) (apply %build-output-section x)) output-groupings))
