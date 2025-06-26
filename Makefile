@@ -1,53 +1,53 @@
 KAS ?= toolchain/paaliaq-as
+KLD ?= toolchain/paaliaq-ld
 KASFLAGS =
+KLDFLAGS =
 
-rtl/build/top.bit: rtl/*.py build/boot0.bin
-	(cd rtl; pdm run build-ecp5)
+BUILDDIR = build
 
-build/%.o: %.scm
+.PRECIOUS: $(BUILDDIR)/%.o
+
+all: rtl/build/top.bit build/memtest.bin build/pmc.bin
+
+rtl/build/top.bit: rtl/*.py $(BUILDDIR)/boot0.bin
+	(cd rtl; pdm run build-ecp5 --target-clk=125)
+
+$(BUILDDIR)/%.o: %.scm
 	mkdir -p ${dir $@}
 	$(KAS) $(KASFLAGS) $< -o $@
 
-
-build/src/boot/boot0.elf: build/src/boot/boot0.o
+%.elf: %.o
 	mkdir -p ${dir $@}
-	guile-3.0 -L toolchain toolchain/reloc.scm "#x008000" $< $@
+	$(KLD) $(KLDFLAGS) $< -o $@
 
-build/boot0.bin: build/src/boot/boot0.elf
+$(BUILDDIR)/src/boot/boot0.elf: KLDFLAGS += -b 8000
+$(BUILDDIR)/src/boot/memtest.elf: KLDFLAGS += -b 9000
+$(BUILDDIR)/src/boot/pmc.elf: KLDFLAGS += -b 9000
+
+$(BUILDDIR)/boot0.bin: $(BUILDDIR)/src/boot/boot0.elf
 	mkdir -p ${dir $@}
-	objcopy -Ielf32-little -Obinary -j.text $< $@
+	objcopy -Ielf32-little -Obinary -j.everything $< $@
 	truncate -s 32K $@
 
-
-build/src/boot/memtest.elf: build/src/boot/memtest.o
+$(BUILDDIR)/src/boot/memtest.bin: $(BUILDDIR)/src/boot/memtest.elf
 	mkdir -p ${dir $@}
-	guile-3.0 -L toolchain toolchain/reloc.scm "#x009000" $< $@
+	objcopy -Ielf32-little -Obinary -j.everything $< $@
 
-build/src/boot/memtest.bin: build/src/boot/memtest.elf
-	mkdir -p ${dir $@}
-	objcopy -Ielf32-little -Obinary -j.text $< $@
-
-build/memtest.bin: build/src/boot/memtest.bin
+$(BUILDDIR)/memtest.bin: $(BUILDDIR)/src/boot/memtest.bin
 	mkdir -p ${dir $@}
 	(printf "0\x00\x90\x00\x00\x04"; cat $<) > $@
 	truncate -s 1030 $@
 
-
-build/src/boot/pmc.elf: build/src/boot/pmc.o
+$(BUILDDIR)/src/boot/pmc.bin: $(BUILDDIR)/src/boot/pmc.elf
 	mkdir -p ${dir $@}
-	guile-3.0 -L toolchain toolchain/reloc.scm "#x009000" $< $@
+	objcopy -Ielf32-little -Obinary -j.everything $< $@
 
-build/src/boot/pmc.bin: build/src/boot/pmc.elf
-	mkdir -p ${dir $@}
-	objcopy -Ielf32-little -Obinary -j.text $< $@
-
-build/pmc.bin: build/src/boot/pmc.bin
+$(BUILDDIR)/pmc.bin: $(BUILDDIR)/src/boot/pmc.bin
 	mkdir -p ${dir $@}
 	(printf "0\x00\x90\x00\x00\x01"; cat $<) > $@
 	truncate -s 262 $@
 
-
 .PHONY: clean
 clean:
-	-rm -r build
+	-rm -r $(BUILDDIR)
 	-rm -r rtl/build
