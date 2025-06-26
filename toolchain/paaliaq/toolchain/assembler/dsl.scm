@@ -13,7 +13,8 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-9 gnu)
 
-  #:export (.text
+  #:export (.head.text
+	    .text
 	    .rodata
 	    .data
 	    .bss
@@ -86,6 +87,9 @@
 	 [syms+relocs (%parse-scn-body data-bv body)])
     (make (first syms+relocs) (second syms+relocs) (get-output-bytevector data-bv))))
 
+
+(define (.head.text . body)
+  (%make-scn $.head.text body))
 
 (define (.text . body)
   (%make-scn $.text body))

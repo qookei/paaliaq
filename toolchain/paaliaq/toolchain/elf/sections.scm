@@ -11,6 +11,7 @@
 	    $.strtab
 	    $.symtab
 	    $.rela
+	    $.head.text
 	    $.text
 	    $.rodata
 	    $.data
@@ -65,6 +66,15 @@
 		(%generate-rela-data symtab-hash relocs) '() '()
 		symtab-idx tgt-idx
 		4 +sizeof-rela+))
+
+
+(define ($.head.text syms relocs data)
+  (make-elf-scn SHT_PROGBITS
+		".head.text"
+		(+ SHF_ALLOC SHF_EXECINSTR) 0
+		data syms relocs
+		SHN_UNDEF SHN_UNDEF
+		1 0))
 
 
 (define ($.text syms relocs data)
