@@ -81,5 +81,5 @@ wrapper script.
 		      (process-inputs-into-sections input-paths +default-section-rules+)])
 	   (emit-output-elf output-name
 			    output-sections
-			    (string->number base)
+			    (string->number base 16)
 			    entry-name)))])))
