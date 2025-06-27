@@ -3,31 +3,37 @@
 
 (define MMIO-BANK #x01)
 
-(define UART0-STATUS #x0001)
-(define UART0-TX-DATA #x0002)
-(define UART0-RX-DATA #x0003)
-
 (define TIMER-TIME #x0014)
+
 
 (define (bank-nr addr)
   (ash addr -16))
 
-(define (bank-plb bank)
-  (* #x0101 bank))
-
 (define (far bank addr)
   (logior addr (ash bank 16)))
 
-(list
- (.text
-  (proc _start
-	clc
-	xce
-	sei
 
-	rep #b00110000 .a-bits 16 .xy-bits 16
-	ldx (imm #x7FFF)
-	txs
+(list
+ (.rodata
+  (.asciz memory-test-str "Starting memory test.\r\n")
+
+  (.asciz pass-str " PASS\r\n")
+  (.asciz fail-str " FAIL\r\n")
+
+  (.asciz write-str " writing 80 ")
+  (.asciz check-str " checking 80 ")
+
+  (.asciz test1-str "Test 1 - walking 1s  ... ")
+  (.asciz test2-str "Test 2 - walking 0s  ... ")
+  (.asciz test3-str "Test 3 - random fill ... ")
+  (.asciz test4-str "Test 4 - bit fade    ... ")
+
+  (.asciz sleep-str " sleeping for ~2 minutes "))
+
+ (.text
+  (proc memory-test .a-bits 16 .xy-bits 16
+	ldx (imm memory-test-str)
+	jsr puts
 
 	#:tests
 
@@ -53,16 +59,6 @@
 
 	bra tests)
 
-  (.byte pass-str ,@(map char->integer (string->list " PASS\r\n")) 0)
-  (.byte fail-str ,@(map char->integer (string->list " FAIL\r\n")) 0)
-  (.byte write-str ,@(map char->integer (string->list " writing 80 ")) 0)
-  (.byte check-str ,@(map char->integer (string->list " checking 80 ")) 0)
-  (.byte test1-str ,@(map char->integer (string->list "Test 1 - walking 1s  ... ")) 0)
-  (.byte test2-str ,@(map char->integer (string->list "Test 2 - walking 0s  ... ")) 0)
-  (.byte test3-str ,@(map char->integer (string->list "Test 3 - random fill ... ")) 0)
-  (.byte test4-str ,@(map char->integer (string->list "Test 4 - bit fade    ... ")) 0)
-  (.byte sleep-str ,@(map char->integer (string->list " sleeping for ~2 minutes ")) 0)
-
   (proc log-test-result .a-bits 16 .xy-bits 16
 	bcs fail
 	ldx (imm pass-str)
@@ -75,18 +71,6 @@
 	jsr puthex-word
 	ldx (imm fail-str)
 	jmp puts)
-
-  (proc show-bank .a-bits 16 .xy-bits 16
-	lda #x08
-	jsr putc
-	lda #x08
-	jsr putc
-	lda #x08
-	jsr putc
-	lda (dp 2)
-	jsr puthex-byte
-	lda #x20
-	jmp putc)
 
 
   (proc test1 .a-bits 16 .xy-bits 16
@@ -401,66 +385,4 @@
 
 	#:fail
 	sec
-	rts)
-
-
-  (proc puthex-nibble
-	.a-bits 16 .xy-bits 16
-	and (imm #x0F)
-	tax
-	lda (x-abs hex-digits)
-	jmp putc)
-
-  (proc puthex-byte
-	.a-bits 16 .xy-bits 16
-	pha
-	lsr (a-reg)
-	lsr (a-reg)
-	lsr (a-reg)
-	lsr (a-reg)
-	jsr puthex-nibble
-	pla
-	and (imm #x0F)
-	jmp puthex-nibble)
-
-  (proc puthex-word
-	.a-bits 16 .xy-bits 16
-	pha
-	xba
-	jsr puthex-byte
-	pla
-	jmp puthex-byte)
-
-  (proc putc
-	php phb
-	phe ,(bank-plb MMIO-BANK)
-	plb plb
-
-	sep #b00100000 .a-bits 8
-	#:tx-full
-	bit (abs ,UART0-STATUS)
-	bpl tx-full
-
-	sta (abs ,UART0-TX-DATA)
-
-	plb plp
-	rts)
-
-  (proc puts
-	.a-bits 16 .xy-bits 16
-	sep #b00100000 .a-bits 8
-
-	#:more
-	lda (x-abs 0)
-	beq done
-	phx
-	jsr putc
-	plx
-	inc (x-reg)
-	bra more
-
-	#:done
-	rep #b00100000 .a-bits 16
-	rts)
-
-  (.byte hex-digits ,@(map char->integer (string->list "0123456789abcdef")))))
+	rts)))
