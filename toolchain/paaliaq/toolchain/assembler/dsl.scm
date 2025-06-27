@@ -25,6 +25,7 @@
 	    .fword
 	    .dword
 	    .zero
+	    .asciz
 
 	    random-label
 	    label-decl
@@ -148,6 +149,10 @@
 			   STV_DEFAULT
 			   size)
 	  (bytevector->u8-list (make-bytevector size)))))
+
+
+(define-syntax-rule (.asciz name string)
+  (.byte name ,@(map char->integer (string->list string)) 0))
 
 
 (define (random-label)
