@@ -6,7 +6,8 @@ authors = [
     {name = "qookie", email = ""},
 ]
 dependencies = [
-    "yowasp-yosys",
+    # Ban 0.55 due to a regression (YosysHQ/yosys#5175)
+    "yowasp-yosys!=0.55.*",
     "yowasp-nextpnr-ecp5",
     "amaranth",
     "amaranth-soc @ git+https://github.com/amaranth-lang/amaranth-soc",

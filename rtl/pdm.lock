@@ -5,14 +5,14 @@
 groups = ["default"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:47cf98dcf5edd82ea71354d0c6fa7758f10c740090a7acb27dcf98675367d5cd"
+content_hash = "sha256:ccd4db9d4ffafe6d141a5037f4d80d6366289fde53a82ab9fff41a55febe50f9"
 
 [[metadata.targets]]
 requires_python = ">=3.12"
 
 [[package]]
 name = "amaranth"
-version = "0.5.4"
+version = "0.5.6"
 requires_python = "~=3.8"
 summary = "Amaranth hardware definition language"
 groups = ["default"]
@@ -23,8 +23,8 @@ dependencies = [
     "pyvcd<0.5,>=0.2.2",
 ]
 files = [
-    {file = "amaranth-0.5.4-py3-none-any.whl", hash = "sha256:ce7473b4220acc78474474fd132177ca545fb144d4e69e1c7dbfc2ed7d32bcf3"},
-    {file = "amaranth-0.5.4.tar.gz", hash = "sha256:a0ea7ffe358ab00d5524b53c43277d279723437be146c8250e26f6b349b8a4fd"},
+    {file = "amaranth-0.5.6-py3-none-any.whl", hash = "sha256:88c64d8849769c576eaecd7add5869765e921b0573658fc7562edf2b350a6476"},
+    {file = "amaranth-0.5.6.tar.gz", hash = "sha256:e6439af40248d76f9f9d761769edb7fd4bcf4bdd120fbc48bad20c72e349d97b"},
 ]
 
 [[package]]
@@ -65,17 +65,16 @@ dependencies = [
 
 [[package]]
 name = "click"
-version = "8.1.8"
-requires_python = ">=3.7"
+version = "8.2.1"
+requires_python = ">=3.10"
 summary = "Composable command line interface toolkit"
 groups = ["default"]
 dependencies = [
     "colorama; platform_system == \"Windows\"",
-    "importlib-metadata; python_version < \"3.8\"",
 ]
 files = [
-    {file = "click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2"},
-    {file = "click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a"},
+    {file = "click-8.2.1-py3-none-any.whl", hash = "sha256:61a3265b914e850b85317d0b3109c7f8cd35a670f963866005d6ef1d5175a12b"},
+    {file = "click-8.2.1.tar.gz", hash = "sha256:27c491cc05d968d271d5a1db13e3b5a184636d9d930f148c50b038f0d0646202"},
 ]
 
 [[package]]
@@ -106,7 +105,7 @@ files = [
 
 [[package]]
 name = "jinja2"
-version = "3.1.5"
+version = "3.1.6"
 requires_python = ">=3.7"
 summary = "A very fast and expressive template engine."
 groups = ["default"]
@@ -114,8 +113,8 @@ dependencies = [
     "MarkupSafe>=2.0",
 ]
 files = [
-    {file = "jinja2-3.1.5-py3-none-any.whl", hash = "sha256:aba0f4dc9ed8013c424088f68a5c226f7d6097ed89b246d7749c2ec4175c6adb"},
-    {file = "jinja2-3.1.5.tar.gz", hash = "sha256:8fefff8dc3034e27bb80d67c671eb8a9bc424c0ef4c0826edbff304cceff43bb"},
+    {file = "jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67"},
+    {file = "jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d"},
 ]
 
 [[package]]
@@ -174,13 +173,13 @@ files = [
 
 [[package]]
 name = "platformdirs"
-version = "4.3.6"
-requires_python = ">=3.8"
+version = "4.3.8"
+requires_python = ">=3.9"
 summary = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
 groups = ["default"]
 files = [
-    {file = "platformdirs-4.3.6-py3-none-any.whl", hash = "sha256:73e575e1408ab8103900836b97580d5307456908a03e92031bab39e4554cc3fb"},
-    {file = "platformdirs-4.3.6.tar.gz", hash = "sha256:357fb2acbc885b0419afd3ce3ed34564c13c9b95c89360cd9563f73aa5e2b907"},
+    {file = "platformdirs-4.3.8-py3-none-any.whl", hash = "sha256:ff7059bb7eb1179e2685604f4aaf157cfd9535242bd23742eadc3c13542139b4"},
+    {file = "platformdirs-4.3.8.tar.gz", hash = "sha256:3d512d96e16bcb959a814c9f348431070822a6496326a4be0911c40b5a74c2bc"},
 ]
 
 [[package]]
@@ -207,7 +206,7 @@ files = [
 
 [[package]]
 name = "wasmtime"
-version = "29.0.0"
+version = "34.0.0"
 requires_python = ">=3.9"
 summary = "A WebAssembly runtime powered by Wasmtime"
 groups = ["default"]
@@ -215,13 +214,17 @@ dependencies = [
     "importlib-resources>=5.10",
 ]
 files = [
-    {file = "wasmtime-29.0.0-py3-none-any.whl", hash = "sha256:3d14a57e43378a848b4cb4e14e3edb9a01d5183cda232291b2dc202b1ade5a06"},
-    {file = "wasmtime-29.0.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:9581250dded9af61677813f67929104d750166eae4319fee8cf2dcffa715fb53"},
-    {file = "wasmtime-29.0.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:ee00f406116db93951a27ddeb4a507f77a8d3e949a1a749b674f67927bd9f419"},
-    {file = "wasmtime-29.0.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:d41f36544a1767c2095e087a12c53953a75d4b8cc1788b8a830b0afde225799a"},
-    {file = "wasmtime-29.0.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:11d3b3e3465c4dd174a22b0f23cd2e02b5e27b04961fac14fce5ac46021e4717"},
-    {file = "wasmtime-29.0.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:3f69eb347bc399f43b524ef95169e1cc93567afb4ea11e6a855eb4f9b37b9cc9"},
-    {file = "wasmtime-29.0.0-py3-none-win_amd64.whl", hash = "sha256:a1d12ae179a87289f1e9d9ade551b393de9fb3e05030953c7aa9454dabf8ffed"},
+    {file = "wasmtime-34.0.0-py3-none-android_26_arm64_v8a.whl", hash = "sha256:d092db8a322a5e59579b4e52f9cf6f0960f71da9c08eeaad6dfb9489542f539b"},
+    {file = "wasmtime-34.0.0-py3-none-android_26_x86_64.whl", hash = "sha256:6b3bcf9621e840bff6f926d424e6f4c864133e0c3d6254adb963dc2f418cedd8"},
+    {file = "wasmtime-34.0.0-py3-none-any.whl", hash = "sha256:ad7aa9965ff597ee821e57c15f83a2306626237e6394410ada544afc014522fa"},
+    {file = "wasmtime-34.0.0-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:ba7dbcc8633ee6edaa93d8be7e45c613ae55fa020a9dfa032f97dca5f92ea6cf"},
+    {file = "wasmtime-34.0.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:31fc042c5acfa1b93a12292f508d9bcfed2caed118b20053d573afaffdd4eda8"},
+    {file = "wasmtime-34.0.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:735a30599f98d92d9d631615651ef4b964f3e32f5f0ab80e4e68c00633789726"},
+    {file = "wasmtime-34.0.0-py3-none-manylinux2014_aarch64.whl", hash = "sha256:39363cebe275fc65c94fff557ca4d1e4f3e2af7a3c309abf506a0bdb2c0dd770"},
+    {file = "wasmtime-34.0.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:62e1b8854ede084aaa1bab2b0b6914c9a2c935072146431f48e9319a8818c666"},
+    {file = "wasmtime-34.0.0-py3-none-win_amd64.whl", hash = "sha256:f8cac47169262e7b0e322c457b9aa82fd1ed274d95542ade68248aeee0c7f7de"},
+    {file = "wasmtime-34.0.0-py3-none-win_arm64.whl", hash = "sha256:4679f52298b206cf8f5d544ca0ec19800df04d606f8e0517b63b0c5d62bda85d"},
+    {file = "wasmtime-34.0.0.tar.gz", hash = "sha256:c8cdf5ca3a186a1687f32828ae24e21a6b316629d41bf85be65edb53dd56913c"},
 ]
 
 [[package]]
@@ -238,22 +241,22 @@ files = [
 
 [[package]]
 name = "yowasp-runtime"
-version = "1.69"
+version = "1.77"
 requires_python = "~=3.8"
 summary = "Common runtime for YoWASP packages"
 groups = ["default"]
 dependencies = [
     "importlib-resources; python_version < \"3.9\"",
     "platformdirs<5,>=3.0",
-    "wasmtime<30,>=21.0.0",
+    "wasmtime<35,>=21.0.0",
 ]
 files = [
-    {file = "yowasp_runtime-1.69-py3-none-any.whl", hash = "sha256:b1e78f8dbb6abf49f6250309b179cc0a8decbc68ef22787fa8b499e4159084cb"},
+    {file = "yowasp_runtime-1.77-py3-none-any.whl", hash = "sha256:7ad7493baa68a8b4a7c3927f0805f783d38afd6d4220e7bdb254575fc0bf28c1"},
 ]
 
 [[package]]
 name = "yowasp-yosys"
-version = "0.53.0.0.post912"
+version = "0.54.0.0.post930"
 summary = "Yosys Open SYnthesis Suite"
 groups = ["default"]
 dependencies = [
@@ -262,5 +265,5 @@ dependencies = [
     "yowasp-runtime~=1.12",
 ]
 files = [
-    {file = "yowasp_yosys-0.53.0.0.post912-py3-none-any.whl", hash = "sha256:681017e3d2fe8db2b5d5845233866ce19eca93d35dbcd5d3a0d0a8c23fcd9413"},
+    {file = "yowasp_yosys-0.54.0.0.post930-py3-none-any.whl", hash = "sha256:7e81d9d11236500a9c80d29aed650b65c5c37316509931e77cc04154a25e8753"},
 ]
