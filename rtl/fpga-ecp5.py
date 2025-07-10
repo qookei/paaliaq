@@ -36,16 +36,6 @@ class TopLevel(Elaboratable):
         # TODO: (Bug amaranth-lang/amaranth#1565).
         # platform.add_clock_constraint(cd_sync.clk, self._target_clk)
 
-        m.submodules.pll = Instance(
-            "EHXPLLL",
-            **compute_pll_params(platform.default_clk_frequency, self._target_clk),
-
-            i_CLKI=platform.request("clk25").i,
-
-            o_CLKOP=ClockSignal("sync"),
-            o_CLKOS=ClockSignal("sdram"),
-            i_CLKFB=ClockSignal("sync"),
-        )
 
         m.submodules.soc = soc = SoC(target_clk=self._target_clk)
 
