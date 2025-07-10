@@ -74,7 +74,7 @@ class P65C816SoftCore(wiring.Component):
             ("i", "D_IN", self.iface.r_data),
             ("o", "D_OUT", self.iface.w_data),
             ("o", "A_OUT", Cat(self.iface.addr_lo, self.iface.addr_hi)),
-            ("o", "WE", self.iface.rw),
+            ("o", "WE_N", self.iface.rw),
             ("o", "VPA", self.iface.vpa),
             ("o", "VDA", self.iface.vda),
             ("o", "VPB", self.iface.vpb),

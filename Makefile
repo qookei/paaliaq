@@ -15,11 +15,11 @@ all: rtl/build/top.bit fw
 fw:
 	cd fw && $(MAKE)
 
-rtl/build/top.bit: rtl/*.py fw
-	(cd rtl; pdm run build-ecp5 --target-clk=125)
+rtl/build/top.bit: fw
+	cd rtl && $(MAKE)
 
 .PHONY: clean
 clean:
 	cd fw && $(MAKE) clean
+	cd rtl && $(MAKE) clean
 	-rm -r $(BUILDDIR)
-	-rm -r rtl/build
