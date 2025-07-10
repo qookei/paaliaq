@@ -1,5 +1,5 @@
 rtl/.pdm-python
 rtl/__pycache__
 rtl/build
-rtl/external
+rtl/external/snestang
 build

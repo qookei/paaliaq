@@ -222,7 +222,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     platform = PaaliaqPlatform(allow_timing_fail=args.allow_timing_fail)
-    platform.add_file('65c816.v', open('external/65c816.v'))
+    platform.add_file('P65C816.v', open('external/P65C816.v'))
     platform.build(TopLevel(
         external_cpu=args.external_cpu,
         target_clk=args.target_clk * 1e6))
