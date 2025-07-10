@@ -221,8 +221,6 @@ if __name__ == '__main__':
     parser.add_argument('--target-clk', type=int, default=75)
 
     args = parser.parse_args()
-    # FIXME(qookie): Don't disable ABC9 once it's fixed and doesn't
-    # croak on the P65C816 soft-core. (Bug YosysHQ/yosys#4249).
     platform = PaaliaqPlatform(allow_timing_fail=args.allow_timing_fail)
     platform.add_file('65c816.v', open('external/65c816.v'))
     platform.build(TopLevel(
