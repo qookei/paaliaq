@@ -140,16 +140,16 @@ class SDRAMController(wiring.Component):
         init_clks = ns_to_clks(200000)
         init_ctr = Signal(range(init_clks + 1))
 
-        tRP = 15
+        tRP = 18
         precharge_clks = ns_to_clks(tRP) + 1
         precharge_ctr = Signal(range(precharge_clks + 1))
 
-        tRFC = 55
+        tRFC = 60
         refresh_clks = ns_to_clks(tRFC)
         refresh_ctr = Signal(range(refresh_clks + 1))
         init_refreshes = Signal(1)
 
-        tRCD = 15
+        tRCD = 18
         activate_clks = ns_to_clks(tRCD) + 1
         activate_ctr = Signal(range(activate_clks + 1))
 

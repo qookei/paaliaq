@@ -33,10 +33,6 @@ class TopLevel(Elaboratable):
         pll.add_primary_output(freq=self._target_clk)
         pll.add_secondary_output(domain="sdram", freq=self._target_clk, phase=180)
 
-        # TODO: (Bug amaranth-lang/amaranth#1565).
-        # platform.add_clock_constraint(cd_sync.clk, self._target_clk)
-
-
         m.submodules.soc = soc = SoC(target_clk=self._target_clk)
 
         uart = platform.request("uart")
@@ -81,10 +77,20 @@ def W65C816Resource(*args, clk, rst, addr, data, rwb, vda, vpa, vpb,
     return Resource.family(*args, default_name='w65c816', ios=io)
 
 
+def HDMIResource(*args, clk_p, clk_n, data_p, data_n, conn=None, attrs=None):
+    io = []
+
+    io.append(Subsignal('clk',  DiffPairs(clk_p,  clk_n,  dir='o', conn=conn, assert_width=1)))
+    io.append(Subsignal('data', DiffPairs(data_p, data_n, dir='o', conn=conn, assert_width=3)))
+
+    if attrs is not None:
+        io.append(attrs)
+    return Resource.family(*args, default_name='hdmi', ios=io)
+
 class PaaliaqPlatform(LatticeECP5Platform):
     device      = "LFE5U-25F"
-    package     = "BG256"
-    speed       = "7"
+    package     = "BG381"
+    speed       = "8"
     default_clk = "clk25"
 
 
@@ -94,36 +100,33 @@ class PaaliaqPlatform(LatticeECP5Platform):
 
 
     resources = [
-        Resource("clk25", 0, Pins("P6", dir="i"), Clock(25e6), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("clk25", 0, Pins("P3", dir="i"), Clock(25e6), Attrs(IO_TYPE="LVCMOS33")),
 
-        *LEDResources(pins="T6", invert=True,
+        *LEDResources(pins="U16", invert=True,
                       attrs=Attrs(IO_TYPE="LVCMOS33", DRIVE="4")),
 
-        *ButtonResources(pins="R7", invert=True,
-                         attrs=Attrs(IO_TYPE="LVCMOS33", PULLMODE="UP")),
-
         SDRAMResource(0,
-            clk="C8", we_n="B5", cas_n="A6", ras_n="B6",
-            ba="B7 A8", a="A9 B9 B10 C10 D9 C9 E9 D8 E8 C7 B8",
-            dq="B2  A2  C3  A3  B3  A4  B4  A5  E7  C6  D7  D6  E6  D5  C5  E5 "
-               "A11 B11 B12 A13 B13 A14 B14 D14 D13 E11 C13 D11 C12 E10 C11 D10",
+            clk="B9", we_n="A10", cas_n="A9", ras_n="B10",
+            ba="B11 C8", a="B13 C14 A16 A17 B16 B15 A14 A13 A12 A11 B12",
+            dq="B6  A5  A6  A7  C7  B8  B5  A8  D8  D7  E8  D6  C6  D5  E7  C5 "
+               "C10 D9  E11 D11 C11 D12 E9  C12 E14 C15 E13 D15 E12 B17 D14 D13",
             attrs=Attrs(PULLMODE="NONE", DRIVE="4", SLEWRATE="FAST", IO_TYPE="LVCMOS33")
         ),
 
-        UARTResource(0, rx="R7", tx="T13"),
+        UARTResource(0, rx="H18", tx="J17"),
 
         # XXX(qookie): This is not the final pin assignment. I haven't
         # designed the PCB with the CPU yet, I just want to see the
         # fMAX when using an external CPU.
-        W65C816Resource(
-            0,
-            clk="C4", rst="D4",
-            addr="E4 D3 F5 E3 F1 F2 G2 G1 H2 H3 B1 C2 C1 D1 E2 E1",
-            data="P5 R3 P2 R2 T2 N6 N14 R12",
-            rwb="R14", vda="T14", vpa="P12", vpb="P14",
-            irq="R15", nmi="T15", abort="P13",
-            attrs=Attrs(PULLMODE="NONE", DRIVE="4", SLEWRATE="FAST", IO_TYPE="LVCMOS33")
-        )
+        #W65C816Resource(
+        #    0,
+        #    clk="C4", rst="D4",
+        #    addr="E4 D3 F5 E3 F1 F2 G2 G1 H2 H3 B1 C2 C1 D1 E2 E1",
+        #    data="P5 R3 P2 R2 T2 N6 N14 R12",
+        #    rwb="R14", vda="T14", vpa="P12", vpb="P14",
+        #    irq="R15", nmi="T15", abort="P13",
+        #    attrs=Attrs(PULLMODE="NONE", DRIVE="4", SLEWRATE="FAST", IO_TYPE="LVCMOS33")
+        #)
     ]
 
     connectors = []
