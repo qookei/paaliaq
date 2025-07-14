@@ -138,6 +138,8 @@ class ECP5PLL(Elaboratable):
         pll_params = {
             "a_ICP_CURRENT": 12,
             "a_LPF_RESISTOR": 8,
+            "a_MFG_ENABLE_FILTEROPAMP": 1,
+            "a_MFG_GMCREF_SEL": 2,
         }
 
         # Wire up input clock
