@@ -16,7 +16,7 @@ fw:
 	cd fw && $(MAKE)
 
 rtl/build/top.bit: fw
-	cd rtl && $(MAKE)
+	cd rtl && $(MAKE) BOOT0_BIN_PATH=$(BUILDDIR)/boot0.bin
 
 .PHONY: clean
 clean:
