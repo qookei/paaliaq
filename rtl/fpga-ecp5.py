@@ -1,7 +1,7 @@
 import argparse, math
 
 from amaranth import *
-from amaranth.lib import wiring
+from amaranth.lib import wiring, io
 from amaranth.build import *
 from amaranth.vendor import LatticeECP5Platform
 from amaranth_boards.resources import *
@@ -31,27 +31,30 @@ class TopLevel(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        clk = platform.request(platform.default_clk).i
+        m.submodules.clk = clk = io.Buffer("i", platform.request(platform.default_clk, dir="-"))
         clk_freq = platform.default_clk_frequency
 
         m.domains.sync = cd_sync = ClockDomain("sync")
         m.domains.sdram = cd_sdram = ClockDomain("sdram")
 
         m.submodules.pll = pll = ECP5PLL()
-        pll.add_input(clk=clk, freq=clk_freq)
+        pll.add_input(clk=clk.i, freq=clk_freq)
         pll.add_primary_output(freq=self._target_clk)
         pll.add_secondary_output(domain="sdram", freq=self._target_clk, phase=180)
 
         m.submodules.soc = soc = SoC(target_clk=self._target_clk)
 
-        uart = platform.request("uart")
+        uart = platform.request("uart", dir="-")
+        m.submodules.uart_tx = uart_tx = io.Buffer("o", uart.tx)
+        m.submodules.uart_rx = uart_rx = io.Buffer("i", uart.rx)
+
         m.d.comb += [
-            uart.tx.o.eq(soc.tx),
-            soc.rx.eq(uart.rx.i),
+            uart_tx.o.eq(soc.tx),
+            soc.rx.eq(uart_rx.i),
         ]
 
-        led = platform.request("led")
-        #m.d.comb += led.o.eq(top.timer.irq.i)
+        # m.submodules.led = led = io.Buffer("o", platform.request("led", dir="-"))
+        # m.d.sync += led.o.eq(~led.o)
 
         m.submodules.sdram = sdram = SDRAMConnector()
         wiring.connect(m, sdram.sdram, soc.sdram)
@@ -65,7 +68,7 @@ class TopLevel(Elaboratable):
         # mode = CTA_MODE_1280x720_60Hz
         mode = SMPTE_MODE_1920x1080_30Hz
 
-        m.submodules.gen = gen = VideoGenerator(mode, clk, clk_freq)
+        m.submodules.gen = gen = VideoGenerator(mode, clk.i, clk_freq)
 
         return m
 
@@ -172,7 +175,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     platform = PaaliaqPlatform(allow_timing_fail=args.allow_timing_fail)
-    platform.add_file('P65C816.v', open('external/P65C816.v'))
+    with open("external/P65C816.v", "r") as f:
+        platform.add_file("P65C816.v", f)
     platform.build(TopLevel(
         external_cpu=args.external_cpu,
         target_clk=args.target_clk * 1e6))

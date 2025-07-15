@@ -1,5 +1,5 @@
 from amaranth import *
-from amaranth.lib import wiring
+from amaranth.lib import wiring, io
 from amaranth.lib.wiring import In, Out
 
 from dataclasses import dataclass, field
@@ -250,9 +250,19 @@ class HDMIEncoder(wiring.Component):
         m.submodules.enc1 = enc1 = DomainRenamer("pixel")(TMDSEncoder())
         m.submodules.enc2 = enc2 = DomainRenamer("pixel")(TMDSEncoder())
 
-        # TODO: platform.request without dir="-" is deprecated
-        # This also affects all other uses of platform.request
-        hdmi = platform.request("hdmi", xdr={'clk': 2, 'data': 2})
+        hdmi = platform.request("hdmi", dir="-")
+
+        m.submodules.hdmi_clk = hdmi_clk = io.DDRBuffer(
+            "o",
+            hdmi.clk,
+            o_domain="tmds",
+        )
+
+        m.submodules.hdmi_data = hdmi_data = io.DDRBuffer(
+            "o",
+            hdmi.data,
+            o_domain="tmds",
+        )
 
         clk_sr = Signal(10)
         red_sr = Signal(10)
@@ -289,16 +299,9 @@ class HDMIEncoder(wiring.Component):
             enc1.data_in.eq(self.green),
             enc2.data_in.eq(self.red),
             # Wire up shift registers to DDR buffers
-            hdmi.clk.o_clk.eq(ClockSignal("tmds")),
-            hdmi.clk.o0.eq(clk_sr[0]),
-            hdmi.clk.o1.eq(clk_sr[1]),
-            hdmi.data.o_clk.eq(ClockSignal("tmds")),
-            hdmi.data.o0[0].eq(blue_sr[0]),
-            hdmi.data.o1[0].eq(blue_sr[1]),
-            hdmi.data.o0[1].eq(green_sr[0]),
-            hdmi.data.o1[1].eq(green_sr[1]),
-            hdmi.data.o0[2].eq(red_sr[0]),
-            hdmi.data.o1[2].eq(red_sr[1]),
+            hdmi_clk.o.eq(clk_sr[:2]),
+            hdmi_data.o[0].eq(Cat(blue_sr[0], green_sr[0], red_sr[0])),
+            hdmi_data.o[1].eq(Cat(blue_sr[1], green_sr[1], red_sr[1])),
         ]
 
         return m

@@ -1,5 +1,5 @@
 from amaranth import *
-from amaranth.lib import wiring
+from amaranth.lib import wiring, io
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import wishbone
 from amaranth_soc.memory import MemoryMap
@@ -32,18 +32,26 @@ class SDRAMConnector(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        sdram = platform.request('sdram')
-        m.d.comb += sdram.clk.o.eq(ClockSignal(self._sdram_domain))
+        sdram = platform.request("sdram", dir="-")
+
+        m.submodules.clk = clk = io.Buffer("o", sdram.clk)
+        m.submodules.ba = ba = io.Buffer("o", sdram.ba)
+        m.submodules.a = a = io.Buffer("o", sdram.a)
+        m.submodules.dq = dq = io.Buffer("io", sdram.dq)
+        m.submodules.we = we = io.Buffer("o", sdram.we)
+        m.submodules.ras = ras = io.Buffer("o", sdram.ras)
+        m.submodules.cas = cas = io.Buffer("o", sdram.cas)
 
         m.d.comb += [
-            sdram.ba.o.eq(self.sdram.ba),
-            sdram.a.o.eq(self.sdram.a),
-            sdram.dq.oe.eq(self.sdram.we),
-            sdram.dq.o.eq(self.sdram.dq_o),
-            self.sdram.dq_i.eq(sdram.dq.i),
-            sdram.we.o.eq(self.sdram.we),
-            sdram.ras.o.eq(self.sdram.ras),
-            sdram.cas.o.eq(self.sdram.cas),
+            clk.o.eq(ClockSignal(self._sdram_domain)),
+            ba.o.eq(self.sdram.ba),
+            a.o.eq(self.sdram.a),
+            dq.oe.eq(self.sdram.we),
+            dq.o.eq(self.sdram.dq_o),
+            self.sdram.dq_i.eq(dq.i),
+            we.o.eq(self.sdram.we),
+            ras.o.eq(self.sdram.ras),
+            cas.o.eq(self.sdram.cas),
         ]
 
         return m

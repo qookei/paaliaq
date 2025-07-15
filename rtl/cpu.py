@@ -1,5 +1,5 @@
 from amaranth import *
-from amaranth.lib import wiring
+from amaranth.lib import wiring, io
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import wishbone, event, csr
 
@@ -37,20 +37,31 @@ class W65C816Connector(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        cpu = platform.request('w65c816')
+        cpu = platform.request("w65c816", dir="-")
+
+        m.submodules.addr = addr = io.Buffer("i", cpu.addr)
+        m.submodules.data = data = io.Buffer("io", cpu.data)
+        m.submodules.rwb = rwb = io.Buffer("i", cpu.rwb)
+        m.submodules.vda = vda = io.Buffer("i", cpu.vda)
+        m.submodules.vpa = vpa = io.Buffer("i", cpu.vpa)
+        m.submodules.vpb = vpb = io.Buffer("i", cpu.vpb)
+        m.submodules.irq = irq = io.Buffer("o", cpu.irq)
+        m.submodules.nmi = nmi = io.Buffer("o", cpu.nmi)
+        m.submodules.abort = abort = io.Buffer("o", cpu.abort)
+
         m.d.comb += [
-            self.iface.addr_lo.eq(cpu.addr.i),
-            self.iface.addr_hi.eq(cpu.data.i),
-            cpu.data.o.eq(self.iface.r_data),
-            cpu.data.oe.eq(self.iface.r_data_en),
-            self.iface.w_data.eq(cpu.data.i),
-            self.iface.rw.eq(cpu.rwb.i),
-            self.iface.vda.eq(cpu.vda.i),
-            self.iface.vpa.eq(cpu.vpa.i),
-            self.iface.vpb.eq(cpu.vpb.i),
-            cpu.irq.o.eq(self.iface.irq),
-            cpu.nmi.o.eq(self.iface.nmi),
-            cpu.abort.o.eq(self.iface.abort),
+            self.iface.addr_lo.eq(addr.i),
+            self.iface.addr_hi.eq(data.i),
+            data.o.eq(self.iface.r_data),
+            data.oe.eq(self.iface.r_data_en),
+            self.iface.w_data.eq(data.i),
+            self.iface.rw.eq(rwb.i),
+            self.iface.vda.eq(vda.i),
+            self.iface.vpa.eq(vpa.i),
+            self.iface.vpb.eq(vpb.i),
+            irq.o.eq(self.iface.irq),
+            nmi.o.eq(self.iface.nmi),
+            abort.o.eq(self.iface.abort),
         ]
 
         return m
