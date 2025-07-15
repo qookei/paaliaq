@@ -12,6 +12,15 @@ from cpu import W65C816Connector, P65C816SoftCore
 
 from pll import ECP5PLL
 
+from video import (
+    DMT_MODE_640x480_60Hz,
+    DMT_MODE_800x600_60Hz,
+    DMT_MODE_1024x768_60Hz,
+    CTA_MODE_1280x720_60Hz,
+    SMPTE_MODE_1920x1080_30Hz,
+    VideoGenerator,
+)
+
 
 class TopLevel(Elaboratable):
     def __init__(self, *, target_clk=75e6, external_cpu=False):
@@ -49,6 +58,14 @@ class TopLevel(Elaboratable):
 
         m.submodules.cpu = cpu = W65C816Connector() if self._external_cpu else P65C816SoftCore()
         wiring.connect(m, cpu.iface, soc.cpu)
+
+        # mode = DMT_MODE_640x480_60Hz
+        # mode = DMT_MODE_800x600_60Hz
+        # mode = DMT_MODE_1024x768_60Hz
+        # mode = CTA_MODE_1280x720_60Hz
+        mode = SMPTE_MODE_1920x1080_30Hz
+
+        m.submodules.gen = gen = VideoGenerator(mode, clk, clk_freq)
 
         return m
 
@@ -114,6 +131,14 @@ class PaaliaqPlatform(LatticeECP5Platform):
         ),
 
         UARTResource(0, rx="H18", tx="J17"),
+
+        HDMIResource(
+            0,
+            clk_p="J19", clk_n="K19",
+            data_p="G19 E20 C20",
+            data_n="H20 F19 D19",
+            attrs=Attrs(DRIVE="4", IO_TYPE="LVCMOS33D"),
+        ),
 
         # XXX(qookie): This is not the final pin assignment. I haven't
         # designed the PCB with the CPU yet, I just want to see the
