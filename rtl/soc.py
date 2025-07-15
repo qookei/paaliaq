@@ -104,9 +104,10 @@ class SoC(wiring.Component):
     tx: Out(1)
     rx: In(1)
 
-    def __init__(self, *, target_clk):
+    def __init__(self, *, target_clk, boot_rom_path):
         super().__init__()
         self._target_clk = target_clk
+        self._boot_rom = generate_boot_ram_contents(boot_rom_path)
 
 
     def elaborate(self, platform):
@@ -123,8 +124,7 @@ class SoC(wiring.Component):
 
         m.submodules.wb_dec = wb_dec = wishbone.Decoder(addr_width=24, data_width=8)
 
-        m.submodules.iram = iram = WishboneSRAM(size=0x10000, data_width=8,
-                                                init=generate_boot_ram_contents('../build/boot0.bin'))
+        m.submodules.iram = iram = WishboneSRAM(size=0x10000, data_width=8, init=self._boot_rom)
         wb_dec.add(iram.wb_bus, addr=0x000000, name='iram')
 
         m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController(target_clk=self._target_clk)

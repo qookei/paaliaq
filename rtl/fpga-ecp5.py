@@ -23,10 +23,11 @@ from video import (
 
 
 class TopLevel(Elaboratable):
-    def __init__(self, *, target_clk=75e6, external_cpu=False):
+    def __init__(self, *, target_clk=75e6, external_cpu=False, boot_rom_path):
         super().__init__()
         self._target_clk = target_clk
         self._external_cpu = external_cpu
+        self._boot_rom_path = boot_rom_path
 
     def elaborate(self, platform):
         m = Module()
@@ -42,7 +43,7 @@ class TopLevel(Elaboratable):
         pll.add_primary_output(freq=self._target_clk)
         pll.add_secondary_output(domain="sdram", freq=self._target_clk, phase=180)
 
-        m.submodules.soc = soc = SoC(target_clk=self._target_clk)
+        m.submodules.soc = soc = SoC(target_clk=self._target_clk, boot_rom_path=self._boot_rom_path)
 
         uart = platform.request("uart", dir="-")
         m.submodules.uart_tx = uart_tx = io.Buffer("o", uart.tx)
@@ -172,6 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('--external-cpu', action='store_true')
     parser.add_argument('--allow-timing-fail', action='store_true')
     parser.add_argument('--target-clk', type=int, default=75)
+    parser.add_argument("--boot-rom", type=str, default="../build/boot0.bin")
 
     args = parser.parse_args()
     platform = PaaliaqPlatform(allow_timing_fail=args.allow_timing_fail)
@@ -179,4 +181,6 @@ if __name__ == '__main__':
         platform.add_file("P65C816.v", f)
     platform.build(TopLevel(
         external_cpu=args.external_cpu,
-        target_clk=args.target_clk * 1e6))
+        target_clk=args.target_clk * 1e6,
+        boot_rom_path=args.boot_rom,
+    ))
