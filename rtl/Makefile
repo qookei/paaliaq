@@ -2,7 +2,7 @@ SV2V ?= sv2v
 
 
 build/top.bit: *.py external/P65C816.v
-	pdm run build-ecp5 --target-clk=125 --allow-timing-fail
+	PYTHONWARNINGS=all pdm run build-ecp5 --target-clk=125 --allow-timing-fail
 
 
 external/P65C816.v:
