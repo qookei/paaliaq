@@ -59,6 +59,48 @@
 
 	bra tests)
 
+
+  (proc dump-256-bytes
+	php .a-bits 16 .xy-bits 16
+
+	sty (dp 2)
+	stz (dp 0)
+
+	txy
+
+	#:heading
+	lda (dp 2)
+	jsr puthex-byte
+	phy
+	tya
+	jsr puthex-word
+	lda #x20
+	jsr putc
+	ply
+
+	#:loop
+	sep #b00100000 .a-bits 8
+	lda (y-ind-far-dp 0)
+	rep #b00100000 .a-bits 16
+	phy
+	jsr puthex-byte
+	lda #x20
+	jsr putc
+	ply
+	inc (y-reg)
+	tya
+	and (imm #xFF)
+	beq done
+	and (imm #x0F)
+	bne loop
+	jsr nl
+	bra heading
+
+	#:done
+	jsr nl
+	plp
+	rts)
+
   (proc log-test-result .a-bits 16 .xy-bits 16
 	bcs fail
 	ldx (imm pass-str)
@@ -70,7 +112,21 @@
 	lda (dp 0)
 	jsr puthex-word
 	ldx (imm fail-str)
-	jmp puts)
+	jsr puts
+
+	ldy (dp 2)
+	lda (dp 0)
+	and #xFF00
+	tax
+	jsr dump-256-bytes
+	rts)
+
+  (proc nl
+	.a-bits 16 .xy-bits 16
+	lda (imm ,(char->integer #\return))
+	jsr putc
+	lda (imm ,(char->integer #\linefeed))
+	jmp putc)
 
 
   (proc test1 .a-bits 16 .xy-bits 16
