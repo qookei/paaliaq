@@ -11,6 +11,10 @@ export KLDFLAGS =
 
 all: rtl/build/top.bit fw
 
+.PHONY: program
+program: rtl/build/top.bit
+	scripts/openocd-program.sh
+
 .PHONY: fw
 fw:
 	cd fw && $(MAKE)
