@@ -12,15 +12,6 @@ from cpu import W65C816Connector, P65C816SoftCore
 
 from pll import ECP5PLL
 
-from video import (
-    DMT_MODE_640x480_60Hz,
-    DMT_MODE_800x600_60Hz,
-    DMT_MODE_1024x768_60Hz,
-    CTA_MODE_1280x720_60Hz,
-    SMPTE_MODE_1920x1080_30Hz,
-    VideoGenerator,
-)
-
 
 class TopLevel(Elaboratable):
     def __init__(self, *, target_clk=75e6, external_cpu=False, boot_rom_path):
@@ -32,7 +23,10 @@ class TopLevel(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        m.domains.clk25 = cd_clk25 = ClockDomain(platform.default_clk)
         m.submodules.clk = clk = io.Buffer("i", platform.request(platform.default_clk, dir="-"))
+        m.d.comb += ClockSignal(platform.default_clk).eq(clk.i)
+
         clk_freq = platform.default_clk_frequency
 
         m.domains.sync = cd_sync = ClockDomain("sync")
@@ -62,14 +56,6 @@ class TopLevel(Elaboratable):
 
         m.submodules.cpu = cpu = W65C816Connector() if self._external_cpu else P65C816SoftCore()
         wiring.connect(m, cpu.iface, soc.cpu)
-
-        # mode = DMT_MODE_640x480_60Hz
-        # mode = DMT_MODE_800x600_60Hz
-        # mode = DMT_MODE_1024x768_60Hz
-        # mode = CTA_MODE_1280x720_60Hz
-        mode = SMPTE_MODE_1920x1080_30Hz
-
-        m.submodules.gen = gen = VideoGenerator(mode, clk.i, clk_freq)
 
         return m
 
