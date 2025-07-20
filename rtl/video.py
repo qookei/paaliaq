@@ -1,332 +1,46 @@
 from amaranth import *
-from amaranth.lib import wiring, io
+from amaranth.lib import wiring, io, memory
 from amaranth.lib.wiring import In, Out
+from amaranth_soc import wishbone
+from amaranth_soc.memory import MemoryMap
 
 from dataclasses import dataclass, field
 
+from hdmi import VideoSequencer, HDMIEncoder, DMT_MODE_1024x768_60Hz
 from pll import ECP5PLL
 
 
-class TMDSEncoder(wiring.Component):
-    active: In(1)
-    data_in: In(8)
-    c0: In(1)
-    c1: In(1)
-
-    data_out: Out(10)
+class TextFramebuffer(wiring.Component):
+    wb_bus: In(wishbone.Signature(addr_width=14, data_width=8))
 
 
-    def elaborate(self, platform):
-        m = Module()
-
-        data_min = Signal(9)
-        m.d.comb += data_min[0].eq(self.data_in[0])
-
-        in_1_cnt = sum(self.data_in)
-
-        with m.If((in_1_cnt > 4) | ((in_1_cnt == 4) & ~self.data_in[0])):
-            m.d.comb += data_min[8].eq(0)
-            for i in range(1, 8):
-                m.d.comb += data_min[i].eq(~(self.data_in[i] ^ data_min[i - 1]))
-        with m.Else():
-            m.d.comb += data_min[8].eq(1)
-            for i in range(1, 8):
-                m.d.comb += data_min[i].eq(self.data_in[i] ^ data_min[i - 1])
-
-        in_balance = in_1_cnt - 4
-        total_balance = Signal(signed(4))
-
-        out = Signal(10)
-
-        with m.If((in_balance == 0) | (total_balance == 0)):
-            with m.If(data_min[8]):
-                m.d.comb += out.eq(Cat(data_min, 0))
-                m.d.sync += total_balance.eq(total_balance + in_balance)
-            with m.Else():
-                m.d.comb += out.eq(Cat(~data_min[0:8], 0, 1))
-                m.d.sync += total_balance.eq(total_balance - in_balance)
-        with m.Else():
-            with m.If(in_balance[3] == total_balance[3]):
-                m.d.comb += out.eq(Cat(~data_min[0:8], data_min[8], 1))
-                m.d.sync += total_balance.eq(total_balance + data_min[8] - in_balance)
-            with m.Else():
-                m.d.comb += out.eq(Cat(data_min, 0))
-                m.d.sync += total_balance.eq(total_balance - (~data_min[8]) + in_balance)
-
-        with m.If(self.active):
-            m.d.sync += self.data_out.eq(out)
-        with m.Else():
-            m.d.sync += [
-                total_balance.eq(0),
-                self.data_out.eq(
-                    Array([
-                        0b0010101011,
-                        0b0010101010,
-                        0b1101010100,
-                        0b1101010101,
-                    ])[Cat(self.c1, self.c0)]
-                ),
-            ]
-
-        return m
-
-
-@dataclass
-class VideoMode:
-    width: int
-    height: int
-    pixel_clock: int
-
-    h_front_porch: int
-    h_back_porch: int
-    h_sync: int
-    h_total: int = field(init=False)
-    h_active_start: int = field(init=False)
-    h_active_end: int = field(init=False)
-    h_sync_start: int = field(init=False)
-
-    v_front_porch: int
-    v_back_porch: int
-    v_sync: int
-    v_total: int = field(init=False)
-    v_active_start: int = field(init=False)
-    v_active_end: int = field(init=False)
-    v_sync_start: int = field(init=False)
-
-
-    def __post_init__(self):
-        self.v_total = self.v_front_porch + self.height + self.v_back_porch + self.v_sync
-        self.h_total = self.h_front_porch + self.width  + self.h_back_porch + self.h_sync
-
-        self.v_active_start = self.v_back_porch
-        self.v_active_end = self.v_back_porch + self.height
-        self.v_sync_start = self.v_active_end + self.v_front_porch
-
-        self.h_active_start = self.h_back_porch
-        self.h_active_end = self.h_back_porch + self.width
-        self.h_sync_start = self.h_active_end + self.h_front_porch
-
-
-DMT_MODE_640x480_60Hz = VideoMode(
-    width=640,
-    height=480,
-    pixel_clock=25000000,
-    h_front_porch=16,
-    h_back_porch=48,
-    h_sync=96,
-    v_front_porch=10,
-    v_back_porch=33,
-    v_sync=2,
-)
-
-DMT_MODE_800x600_60Hz = VideoMode(
-    width=800,
-    height=600,
-    pixel_clock=40000000,
-    h_front_porch=40,
-    h_back_porch=88,
-    h_sync=128,
-    v_front_porch=1,
-    v_back_porch=23,
-    v_sync=4,
-)
-
-DMT_MODE_1024x768_60Hz = VideoMode(
-    width=1024,
-    height=768,
-    pixel_clock=65000000,
-    h_front_porch=24,
-    h_back_porch=160,
-    h_sync=136,
-    v_front_porch=3,
-    v_back_porch=29,
-    v_sync=6,
-)
-
-CTA_MODE_1280x720_60Hz = VideoMode(
-    width=1280,
-    height=720,
-    pixel_clock=75000000,
-    h_front_porch=110,
-    h_back_porch=220,
-    h_sync=40,
-    v_front_porch=5,
-    v_back_porch=20,
-    v_sync=5,
-)
-
-SMPTE_MODE_1920x1080_30Hz = VideoMode(
-    width=1920,
-    height=1080,
-    pixel_clock=75000000,
-    h_front_porch=88,
-    h_back_porch=148,
-    h_sync=44,
-    v_front_porch=4,
-    v_back_porch=36,
-    v_sync=5,
-)
-
-
-class VideoSequencer(wiring.Component):
-    h_sync: Out(1)
-    v_sync: Out(1)
-    active: Out(1)
-
-    h_pos: Out(16)
-    v_pos: Out(16)
-
-    h_start: Out(1)
-    v_start: Out(1)
-
-
-    def __init__(self, mode, pipeline_depth=0):
+    def __init__(self, in_clk, in_freq):
         super().__init__()
-        self.mode = mode
-        self.pipeline_depth = pipeline_depth
-
-    def elaborate(self, platform):
-        m = Module()
-
-        mode = self.mode
-
-        if self.pipeline_depth > mode.h_active_start:
-            raise ValueError("Requested pixel pipeline is too deep")
-
-        h_pos = Signal(range(mode.h_total))
-        v_pos = Signal(range(mode.v_total))
-
-        h_active = (h_pos >= mode.h_active_start) & (h_pos < mode.h_active_end)
-        v_active = (v_pos >= mode.v_active_start) & (v_pos < mode.v_active_end)
-
-        m.d.sync += [
-            self.h_sync.eq(h_pos >= mode.h_sync_start),
-            self.h_sync.eq(v_pos >= mode.v_sync_start),
-            self.active.eq(h_active & v_active),
-            self.h_pos.eq(Mux(self.active, h_pos - mode.h_active_start, 0)),
-            self.v_pos.eq(Mux(self.active, v_pos - mode.v_active_start, 0)),
-        ]
-
-        h_edge = h_pos == mode.h_total - 1
-        v_edge = v_pos == mode.v_total - 1
-
-        m.d.sync += h_pos.eq(h_pos + 1)
-        with m.If(h_edge):
-            m.d.sync += [
-                h_pos.eq(0),
-                v_pos.eq(Mux(v_edge, 0, v_pos + 1)),
-            ]
-
-        pipeline_h_active_start = mode.h_active_start - self.pipeline_depth
-        pipeline_h_active_end = mode.h_active_end - self.pipeline_depth
-
-        pipeline_h_active = (h_pos >= pipeline_h_active_start) & (h_pos < pipeline_h_active_end)
-        pipeline_active = pipeline_h_active & v_active
-
-        m.d.sync += [
-            self.h_start.eq(h_pos == pipeline_h_active_start),
-            self.v_start.eq(v_pos == mode.v_active_start),
-            self.h_pos.eq(Mux(pipeline_active, h_pos - pipeline_h_active_start, 0)),
-            self.v_pos.eq(Mux(pipeline_active, v_pos - mode.v_active_start, 0)),
-        ]
-
-        return m
-
-
-class HDMIEncoder(wiring.Component):
-    red: In(8)
-    green: In(8)
-    blue: In(8)
-
-    h_sync: In(1)
-    v_sync: In(1)
-    active: In(1)
-
-
-    def elaborate(self, platform):
-        m = Module()
-
-        m.submodules.enc0 = enc0 = DomainRenamer("pixel")(TMDSEncoder())
-        m.submodules.enc1 = enc1 = DomainRenamer("pixel")(TMDSEncoder())
-        m.submodules.enc2 = enc2 = DomainRenamer("pixel")(TMDSEncoder())
-
-        hdmi = platform.request("hdmi", dir="-")
-
-        m.submodules.hdmi_clk = hdmi_clk = io.DDRBuffer(
-            "o",
-            hdmi.clk,
-            o_domain="tmds",
-        )
-
-        m.submodules.hdmi_data = hdmi_data = io.DDRBuffer(
-            "o",
-            hdmi.data,
-            o_domain="tmds",
-        )
-
-        clk_sr = Signal(10)
-        red_sr = Signal(10)
-        green_sr = Signal(10)
-        blue_sr = Signal(10)
-
-        tmds_sr_ctr = Signal(5, init=1)
-
-        m.d.tmds += [
-            tmds_sr_ctr.eq(tmds_sr_ctr.rotate_left(1)),
-
-            clk_sr.eq(clk_sr >> 2),
-            red_sr.eq(red_sr >> 2),
-            green_sr.eq(green_sr >> 2),
-            blue_sr.eq(blue_sr >> 2),
-        ]
-
-        with m.If(tmds_sr_ctr[0]):
-            m.d.tmds += [
-                clk_sr.eq(0b0000011111),
-                blue_sr.eq(enc0.data_out),
-                green_sr.eq(enc1.data_out),
-                red_sr.eq(enc2.data_out),
-            ]
-
-        m.d.comb += [
-            # Wire up component inputs to encoders
-            enc0.c0.eq(self.h_sync),
-            enc0.c1.eq(self.v_sync),
-            enc0.active.eq(self.active),
-            enc1.active.eq(self.active),
-            enc2.active.eq(self.active),
-            enc0.data_in.eq(self.blue),
-            enc1.data_in.eq(self.green),
-            enc2.data_in.eq(self.red),
-            # Wire up shift registers to DDR buffers
-            hdmi_clk.o.eq(clk_sr[:2]),
-            hdmi_data.o[0].eq(Cat(blue_sr[0], green_sr[0], red_sr[0])),
-            hdmi_data.o[1].eq(Cat(blue_sr[1], green_sr[1], red_sr[1])),
-        ]
-
-        return m
-
-
-class VideoGenerator(Elaboratable):
-    def __init__(self, mode, in_clk, in_freq):
-        super().__init__()
-        self.mode = mode
         self._in_clk = in_clk
         self._in_freq = in_freq
 
+        self.wb_bus.memory_map = MemoryMap(addr_width=14, data_width=8)
+        self.wb_bus.memory_map.add_resource(self, name=("text",), size=128*48*2)
+        self.wb_bus.memory_map.freeze()
+
     def elaborate(self, platform):
         m = Module()
+
+        # ---
+        # Signal generation logic
+
+        mode = DMT_MODE_1024x768_60Hz
 
         m.domains.tmds = cd_tmds = ClockDomain("tmds")
         m.domains.pixel = cd_pixel = ClockDomain("pixel")
 
         m.submodules.pll = pll = ECP5PLL()
         pll.add_input(clk=self._in_clk, freq=self._in_freq)
-        pll.add_primary_output(domain="tmds", freq=self.mode.pixel_clock * 5)
-        pll.add_secondary_output(domain="pixel", freq=self.mode.pixel_clock)
+        pll.add_primary_output(domain="tmds", freq=mode.pixel_clock * 5)
+        pll.add_secondary_output(domain="pixel", freq=mode.pixel_clock)
 
         m.submodules.enc = enc = HDMIEncoder()
-        m.submodules.seq = seq = DomainRenamer("pixel")(VideoSequencer(self.mode, pipeline_depth=1))
+        m.submodules.seq = seq = DomainRenamer("pixel")(VideoSequencer(mode, pipeline_depth=2))
 
         m.d.comb += [
             enc.h_sync.eq(seq.h_sync),
@@ -334,10 +48,92 @@ class VideoGenerator(Elaboratable):
             enc.active.eq(seq.active),
         ]
 
-        m.d.pixel += [
-            enc.blue.eq(seq.h_pos ^ seq.v_pos),
-            enc.green.eq(((seq.h_pos + seq.v_pos) << 1) & ((seq.v_pos - seq.h_pos) >> 2)),
-            enc.red.eq((seq.v_pos << 1) ^ (~seq.h_pos >> 3)),
+        # ---
+        # Pixel generation logic
+
+        with open("WIGGLY.F16", "rb") as f:
+            font_data = f.read()
+
+        m.submodules.font = font = memory.Memory(
+            shape=unsigned(8),
+            depth=256 * 16,
+            init=font_data,
+        )
+
+        m.submodules.text = text = memory.Memory(
+            shape=unsigned(16),
+            depth=128*48,
+            init=[],
+        )
+
+        def delayed(sig, by):
+            x = sig
+            for i in range(by):
+                y = Signal.like(sig)
+                m.d.pixel += y.eq(x)
+                x = y
+
+            return x
+
+        cursor_x = Signal(range(128))
+        cursor_y = Signal(range(48))
+
+        cursor_blink = Signal(range(64))
+        with m.If(seq.v_start):
+            m.d.pixel += cursor_blink.eq(cursor_blink + 1)
+
+        font_rd = font.read_port(domain="pixel")
+        text_rd = text.read_port(domain="pixel")
+
+        m.d.comb += text_rd.addr.eq((seq.h_pos >> 3) + (seq.v_pos >> 4) * 128)
+
+        char, fg, bg = Signal(8), Signal(4), Signal(4)
+        m.d.comb += Cat(char, fg, bg).eq(text_rd.data)
+
+        m.d.comb += font_rd.addr.eq(char * 16 + (seq.v_pos & 15))
+
+        colors = Array([
+            0x000000,
+            0x0000AA,
+            0x00AA00,
+            0x00AAAA,
+            0xAA0000,
+            0xAA00AA,
+            0xAA5500,
+            0xAAAAAA,
+            0x555555,
+            0x5555FF,
+            0x55FF55,
+            0x55FFFF,
+            0xFF5555,
+            0xFF55FF,
+            0xFFFF55,
+            0xFFFFFF,
+        ])
+
+        cell_x = delayed(seq.h_pos, 2)
+        font_bit = font_rd.data[::-1].bit_select(cell_x & 7, 1)
+        in_cursor_cell = ((cell_x >> 3) == cursor_x) & ((seq.v_pos >> 4) == cursor_y)
+        in_cursor_line = in_cursor_cell & ((seq.v_pos & 0b1110) == 0b1110) & ((cursor_blink >> 4) & 1)
+        bit = in_cursor_line | font_bit
+
+        m.d.comb += Cat(enc.blue, enc.green, enc.red).eq(
+            colors[Mux(bit, delayed(fg, 1), delayed(bg, 1))]
+        )
+
+        # ---
+        # Wishbone text buffer access (write-only)
+
+        text_wr = text.write_port(granularity=8)
+        m.d.comb += [
+            text_wr.addr.eq(self.wb_bus.adr >> 1),
+            text_wr.data.eq(self.wb_bus.dat_w.replicate(2)),
         ]
+
+        with m.If(self.wb_bus.ack):
+            m.d.sync += self.wb_bus.ack.eq(0)
+        with m.Elif(self.wb_bus.cyc & self.wb_bus.stb):
+            m.d.comb += text_wr.en.eq(Mux(self.wb_bus.we, 1 << (self.wb_bus.adr & 1), 0))
+            m.d.sync += self.wb_bus.ack.eq(1)
 
         return m

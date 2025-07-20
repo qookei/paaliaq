@@ -15,6 +15,9 @@ from uart import UARTPeripheral
 from sdram import SDRAMController, SDRAMSignature
 from mmu import MMU
 
+from video import TextFramebuffer
+
+
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
 from amaranth_soc.csr.event import EventMonitor
@@ -130,6 +133,12 @@ class SoC(wiring.Component):
         m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController(target_clk=self._target_clk)
         wb_dec.add(sdram_ctrl.wb_bus, addr=0x800000, name='sdram')
         wiring.connect(m, sdram_ctrl.sdram, wiring.flipped(self.sdram))
+
+        m.submodules.gen = gen = TextFramebuffer(
+            ClockSignal(platform.default_clk),
+            platform.default_clk_frequency)
+        wb_dec.add(gen.wb_bus, addr=0x100000, name="text")
+
 
         m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=8, data_width=8)
 
