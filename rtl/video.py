@@ -122,18 +122,22 @@ class TextFramebuffer(wiring.Component):
         )
 
         # ---
-        # Wishbone text buffer access (write-only)
+        # Wishbone text buffer access
 
+        text_bus_rd = text.read_port()
         text_wr = text.write_port(granularity=8)
         m.d.comb += [
+            text_bus_rd.addr.eq(self.wb_bus.adr >> 1),
             text_wr.addr.eq(self.wb_bus.adr >> 1),
             text_wr.data.eq(self.wb_bus.dat_w.replicate(2)),
+            self.wb_bus.dat_r.eq(text_bus_rd.data.word_select(self.wb_bus.adr & 1, 8)),
         ]
 
         with m.If(self.wb_bus.ack):
             m.d.sync += self.wb_bus.ack.eq(0)
         with m.Elif(self.wb_bus.cyc & self.wb_bus.stb):
             m.d.comb += text_wr.en.eq(Mux(self.wb_bus.we, 1 << (self.wb_bus.adr & 1), 0))
+            m.d.comb += text_bus_rd.en.eq(~self.wb_bus.we)
             m.d.sync += self.wb_bus.ack.eq(1)
 
         return m
