@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -ex
+
 SCRIPTDIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 RTLDIR="${SCRIPTDIR}/../rtl"
 
