@@ -38,6 +38,8 @@
 	ldx (imm choices-str)
 	jsr puts
 
+	jsr video-test
+
 	#:choice
 	jsr getc
 	and #xFF
@@ -57,6 +59,29 @@
 	#:do-memory-test
 	jmp memory-test)
 
+  (proc video-test .a-bits 16 .xy-bits 16
+	phb
+	phe #x1010
+	plb plb
+
+	lda #x1234
+	sta (dp 16)
+	sta (dp 18)
+
+	ldx 0
+
+	sep #b00100000 .a-bits 8
+	#:loop
+	jsr rand
+	sta (x-abs #x0000)
+
+	inc (x-reg)
+	cpx ,(* 128 48 2)
+	bne loop
+	rep #b00100000 .a-bits 16
+
+	plb
+	rts)
 
   (proc show-bank .a-bits 16 .xy-bits 16
 	lda #x08
