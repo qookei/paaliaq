@@ -3,6 +3,14 @@
   (.zero video-cursor-x 2)
   (.zero video-cursor-y 2))
  (.text
+  (proc video-update-cursor .a-bits 16 .xy-bits 16
+	lda (far-abs video-cursor-x)
+	sta (far-abs #x010060)
+	lda (far-abs video-cursor-y)
+	sta (far-abs #x010062)
+
+	rts)
+
   (proc video-scroll .a-bits 16 .xy-bits 16
 	phb
 
@@ -20,6 +28,7 @@
 
 	lda 47
 	sta (far-abs video-cursor-y)
+	jsr video-update-cursor
 
 	plb
 	rts)
@@ -41,6 +50,7 @@
 	lda 0
 	sta (far-abs video-cursor-x)
 	sta (far-abs video-cursor-y)
+	jsr video-update-cursor
 
 	plb
 	rts)
@@ -112,6 +122,7 @@
 	jsr video-scroll
 
 	#:done
+	jsr video-update-cursor
 	plp
 	rts
 
