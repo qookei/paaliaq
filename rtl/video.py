@@ -111,22 +111,22 @@ class TextFramebuffer(wiring.Component):
         m.d.comb += font_rd.addr.eq(char * 16 + (seq.v_pos & 15))
 
         colors = Array([
-            0x000000,
-            0x0000AA,
-            0x00AA00,
-            0x00AAAA,
-            0xAA0000,
-            0xAA00AA,
-            0xAA5500,
-            0xAAAAAA,
-            0x555555,
-            0x5555FF,
-            0x55FF55,
-            0x55FFFF,
-            0xFF5555,
-            0xFF55FF,
-            0xFFFF55,
-            0xFFFFFF,
+            0x232627,
+            0xed1515,
+            0x11d116,
+            0xf67400,
+            0x1d99f3,
+            0x9b59b6,
+            0x1abc9c,
+            0xfcfcfc,
+            0x7f8c8d,
+            0xc0392b,
+            0x1cdc9a,
+            0xfdbc4b,
+            0x3daee9,
+            0x8e44ad,
+            0x16a085,
+            0xffffff,
         ])
 
         cell_x = delayed(seq.h_pos, 2)
