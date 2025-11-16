@@ -134,12 +134,6 @@ class SoC(wiring.Component):
         wb_dec.add(sdram_ctrl.wb_bus, addr=0x800000, name='sdram')
         wiring.connect(m, sdram_ctrl.sdram, wiring.flipped(self.sdram))
 
-        m.submodules.gen = gen = TextFramebuffer(
-            ClockSignal(platform.default_clk),
-            platform.default_clk_frequency)
-        wb_dec.add(gen.wb_bus, addr=0x100000, name="text")
-
-
         m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=8, data_width=8)
 
         m.submodules.uart = uart = UARTPeripheral(target_clk=self._target_clk)
@@ -161,6 +155,12 @@ class SoC(wiring.Component):
         wiring.connect(m, cpu_bridge.mmu, mmu.iface)
 
         csr_dec.add(cpu_bridge.csr_bus, name='dbg')
+
+        m.submodules.gen = gen = TextFramebuffer(
+            ClockSignal(platform.default_clk),
+            platform.default_clk_frequency)
+        wb_dec.add(gen.wb_bus, addr=0x100000, name="text")
+        csr_dec.add(gen.csr_bus, name="text")
 
         # This freezes the CSR memory map.
         m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)

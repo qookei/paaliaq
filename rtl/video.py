@@ -1,7 +1,7 @@
 from amaranth import *
 from amaranth.lib import wiring, io, memory
 from amaranth.lib.wiring import In, Out
-from amaranth_soc import wishbone
+from amaranth_soc import csr, wishbone
 from amaranth_soc.memory import MemoryMap
 
 from dataclasses import dataclass, field
@@ -12,6 +12,11 @@ from pll import ECP5PLL
 
 class TextFramebuffer(wiring.Component):
     wb_bus: In(wishbone.Signature(addr_width=14, data_width=8))
+    csr_bus: wiring.In(csr.Signature(addr_width=4, data_width=8))
+
+    class CursorRegister(csr.Register, access="rw"):
+        x: csr.Field(csr.action.RW, 16)
+        y: csr.Field(csr.action.RW, 16)
 
 
     def __init__(self, in_clk, in_freq):
@@ -19,12 +24,21 @@ class TextFramebuffer(wiring.Component):
         self._in_clk = in_clk
         self._in_freq = in_freq
 
+        regs = csr.Builder(addr_width=4, data_width=8)
+        self._cursor = regs.add("Cursor", self.CursorRegister())
+        mmap = regs.as_memory_map()
+        self._bridge = csr.Bridge(mmap)
+        self.csr_bus.memory_map = mmap
+
         self.wb_bus.memory_map = MemoryMap(addr_width=14, data_width=8)
         self.wb_bus.memory_map.add_resource(self, name=("text",), size=128*48*2)
         self.wb_bus.memory_map.freeze()
 
     def elaborate(self, platform):
         m = Module()
+
+        m.submodules.bridge = self._bridge
+        wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         # ---
         # Signal generation logic
@@ -77,6 +91,11 @@ class TextFramebuffer(wiring.Component):
 
         cursor_x = Signal(range(128))
         cursor_y = Signal(range(48))
+
+        m.d.sync += [
+            cursor_x.eq(self._cursor.f.x.data),
+            cursor_y.eq(self._cursor.f.y.data),
+        ]
 
         cursor_blink = Signal(range(64))
         with m.If(seq.v_start):
