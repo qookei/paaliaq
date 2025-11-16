@@ -12,7 +12,7 @@ requires_python = ">=3.12"
 
 [[package]]
 name = "amaranth"
-version = "0.5.6"
+version = "0.5.8"
 requires_python = "~=3.8"
 summary = "Amaranth hardware definition language"
 groups = ["default"]
@@ -23,16 +23,16 @@ dependencies = [
     "pyvcd<0.5,>=0.2.2",
 ]
 files = [
-    {file = "amaranth-0.5.6-py3-none-any.whl", hash = "sha256:88c64d8849769c576eaecd7add5869765e921b0573658fc7562edf2b350a6476"},
-    {file = "amaranth-0.5.6.tar.gz", hash = "sha256:e6439af40248d76f9f9d761769edb7fd4bcf4bdd120fbc48bad20c72e349d97b"},
+    {file = "amaranth-0.5.8-py3-none-any.whl", hash = "sha256:6c32bd3422c700d246904032c1252f0a84225d2bdf9e26de4bc7df2ec83a8b39"},
+    {file = "amaranth-0.5.8.tar.gz", hash = "sha256:a9d6221fdb002614e82ac3603d245827829f279e8eb5fc543c948ea3609328ea"},
 ]
 
 [[package]]
 name = "amaranth-boards"
-version = "0.1.dev258"
+version = "0.1.dev259"
 requires_python = "~=3.9"
 git = "https://github.com/amaranth-lang/amaranth-boards"
-revision = "c26a72e59c786b38e0e989ae64c6c2560ca7c29c"
+revision = "7e24efe2f6e95afddd0c1b56f1a9423c48caa472"
 summary = "Board and connector definitions for Amaranth HDL"
 groups = ["default"]
 dependencies = [
@@ -229,14 +229,14 @@ files = [
 
 [[package]]
 name = "yowasp-nextpnr-ecp5"
-version = "0.8.0.0.post621"
+version = "0.9.0.0.post686"
 summary = "nextpnr-ecp5 FPGA place and route tool"
 groups = ["default"]
 dependencies = [
     "yowasp-runtime~=1.1",
 ]
 files = [
-    {file = "yowasp_nextpnr_ecp5-0.8.0.0.post621-py3-none-any.whl", hash = "sha256:8b8d36cdd1ead15d045b080fe4b9bcecf36a8cecc4300bca11d8f9d3051a541f"},
+    {file = "yowasp_nextpnr_ecp5-0.9.0.0.post686-py3-none-any.whl", hash = "sha256:7a00778285c7c08fb85062665c2c10090490dbe75afca098e062b4e3ff6889f2"},
 ]
 
 [[package]]
@@ -256,14 +256,14 @@ files = [
 
 [[package]]
 name = "yowasp-yosys"
-version = "0.54.0.0.post930"
+version = "0.59.0.0.post1039"
+requires_python = "~=3.9"
 summary = "Yosys Open SYnthesis Suite"
 groups = ["default"]
 dependencies = [
     "click",
-    "importlib-resources; python_version < \"3.9\"",
     "yowasp-runtime~=1.12",
 ]
 files = [
-    {file = "yowasp_yosys-0.54.0.0.post930-py3-none-any.whl", hash = "sha256:7e81d9d11236500a9c80d29aed650b65c5c37316509931e77cc04154a25e8753"},
+    {file = "yowasp_yosys-0.59.0.0.post1039-py3-none-any.whl", hash = "sha256:06a98c8f7a57000ba3c67e8bcd14ffe8babd5f3001b86297953f60c6629f89c0"},
 ]
