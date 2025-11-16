@@ -105,6 +105,8 @@
 
 	sep #b00100000 .a-bits 8
 	sta (x-abs #x0000)
+	lda #x0F
+	sta (x-abs #x0001)
 	rep #b00100000 .a-bits 16
 
 	plb
