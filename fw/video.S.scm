@@ -64,7 +64,7 @@
 	#:linefeed
 	inc (abs video-cursor-y)
 	lda (abs video-cursor-y)
-	cmp 47
+	cmp 48
 	bne done
 	jsr video-scroll
 	bra done
@@ -107,7 +107,7 @@
 	stz (abs video-cursor-x)
 	inc (abs video-cursor-y)
 	lda (abs video-cursor-y)
-	cmp 47
+	cmp 48
 	bne done
 	jsr video-scroll
 
