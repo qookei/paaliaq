@@ -248,15 +248,27 @@ class HDMIEncoder(wiring.Component):
 
         hdmi = platform.request("hdmi", dir="-")
 
-        m.submodules.hdmi_clk = hdmi_clk = io.DDRBuffer(
+        m.submodules.hdmi_clk_p = hdmi_clk_p = io.DDRBuffer(
             "o",
-            hdmi.clk,
+            hdmi.clk_p,
             o_domain="tmds",
         )
 
-        m.submodules.hdmi_data = hdmi_data = io.DDRBuffer(
+        m.submodules.hdmi_clk_n = hdmi_clk_n = io.DDRBuffer(
             "o",
-            hdmi.data,
+            hdmi.clk_n,
+            o_domain="tmds",
+        )
+
+        m.submodules.hdmi_data_p = hdmi_data_p = io.DDRBuffer(
+            "o",
+            hdmi.data_p,
+            o_domain="tmds",
+        )
+
+        m.submodules.hdmi_data_n = hdmi_data_n = io.DDRBuffer(
+            "o",
+            hdmi.data_n,
             o_domain="tmds",
         )
 
@@ -295,9 +307,12 @@ class HDMIEncoder(wiring.Component):
             enc1.data_in.eq(self.green),
             enc2.data_in.eq(self.red),
             # Wire up shift registers to DDR buffers
-            hdmi_clk.o.eq(clk_sr[:2]),
-            hdmi_data.o[0].eq(Cat(blue_sr[0], green_sr[0], red_sr[0])),
-            hdmi_data.o[1].eq(Cat(blue_sr[1], green_sr[1], red_sr[1])),
+            hdmi_clk_p.o.eq( clk_sr[:2]),
+            hdmi_clk_n.o.eq(~clk_sr[:2]),
+            hdmi_data_p.o[0].eq(Cat(blue_sr[0], green_sr[0], red_sr[0])),
+            hdmi_data_p.o[1].eq(Cat(blue_sr[1], green_sr[1], red_sr[1])),
+            hdmi_data_n.o[0].eq(~Cat(blue_sr[0], green_sr[0], red_sr[0])),
+            hdmi_data_n.o[1].eq(~Cat(blue_sr[1], green_sr[1], red_sr[1])),
         ]
 
         return m

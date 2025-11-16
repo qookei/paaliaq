@@ -87,8 +87,10 @@ def W65C816Resource(*args, clk, rst, addr, data, rwb, vda, vpa, vpb,
 def HDMIResource(*args, clk_p, clk_n, data_p, data_n, conn=None, attrs=None):
     io = []
 
-    io.append(Subsignal('clk',  DiffPairs(clk_p,  clk_n,  dir='o', conn=conn, assert_width=1)))
-    io.append(Subsignal('data', DiffPairs(data_p, data_n, dir='o', conn=conn, assert_width=3)))
+    io.append(Subsignal('clk_p', Pins(clk_p, dir='o', conn=conn, assert_width=1)))
+    io.append(Subsignal('clk_n', Pins(clk_n, dir='o', conn=conn, assert_width=1)))
+    io.append(Subsignal('data_p', Pins(data_p, dir='o', conn=conn, assert_width=3)))
+    io.append(Subsignal('data_n', Pins(data_n, dir='o', conn=conn, assert_width=3)))
 
     if attrs is not None:
         io.append(attrs)
