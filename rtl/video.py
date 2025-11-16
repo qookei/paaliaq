@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from hdmi import VideoSequencer, HDMIEncoder, DMT_MODE_1024x768_60Hz
 from pll import ECP5PLL
 
+from font import get_font_data
+
 
 class TextFramebuffer(wiring.Component):
     wb_bus: In(wishbone.Signature(addr_width=14, data_width=8))
@@ -65,13 +67,10 @@ class TextFramebuffer(wiring.Component):
         # ---
         # Pixel generation logic
 
-        with open("WIGGLY.F16", "rb") as f:
-            font_data = f.read()
-
         m.submodules.font = font = memory.Memory(
             shape=unsigned(8),
             depth=256 * 16,
-            init=font_data,
+            init=get_font_data(),
         )
 
         m.submodules.text = text = memory.Memory(
