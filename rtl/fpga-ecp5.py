@@ -48,8 +48,39 @@ class TopLevel(Elaboratable):
             soc.rx.eq(uart_rx.i),
         ]
 
-        # m.submodules.led = led = io.Buffer("o", platform.request("led", dir="-"))
-        # m.d.sync += led.o.eq(~led.o)
+        led = platform.request("rgb_led", dir="-")
+        m.submodules.led_r = led_r = io.FFBuffer("o", led.r, o_domain="clk25")
+        m.submodules.led_g = led_g = io.FFBuffer("o", led.g, o_domain="clk25")
+        m.submodules.led_b = led_b = io.FFBuffer("o", led.b, o_domain="clk25")
+
+        period_ctr = Signal(8)
+        duty_ctr = Signal(8)
+        duty_dir = Signal()
+        led_sel = Signal(3, init=1)
+
+        timing = Signal(range(125000))
+        m.d.clk25 += timing.eq(timing + 1)
+
+        with m.If(timing == 124999):
+            m.d.clk25 += timing.eq(0)
+
+            with m.If(duty_dir):
+                with m.If(duty_ctr == 0):
+                    m.d.clk25 += duty_dir.eq(~duty_dir)
+                    m.d.clk25 += led_sel.eq(led_sel.rotate_left(1))
+                with m.Else():
+                    m.d.clk25 += duty_ctr.eq(duty_ctr - 1)
+            with m.Else():
+                with m.If(duty_ctr == 255):
+                    m.d.clk25 += duty_dir.eq(~duty_dir)
+                with m.Else():
+                    m.d.clk25 += duty_ctr.eq(duty_ctr + 1)
+
+        m.d.clk25 += period_ctr.eq(period_ctr + 1)
+
+        m.d.comb += led_r.o.eq((duty_ctr >= period_ctr) & (led_sel == 0b001))
+        m.d.comb += led_g.o.eq((duty_ctr >= period_ctr) & (led_sel == 0b010))
+        m.d.comb += led_b.o.eq((duty_ctr >= period_ctr) & (led_sel == 0b100))
 
         m.submodules.sdram = sdram = SDRAMConnector()
         wiring.connect(m, sdram.sdram, soc.sdram)
@@ -111,8 +142,11 @@ class PaaliaqPlatform(LatticeECP5Platform):
     resources = [
         Resource("clk25", 0, Pins("P6", dir="i"), Clock(25e6), Attrs(IO_TYPE="LVCMOS33")),
 
-        *LEDResources(pins="B11", invert=True,
-                      attrs=Attrs(IO_TYPE="LVCMOS33", DRIVE="4")),
+        RGBLEDResource(
+            0,
+            r="B11", g="A11", b="A12",
+            attrs=Attrs(IO_TYPE="LVCMOS33", DRIVE="4")
+        ),
 
         SDRAMResource(0,
             clk="R15", cke="L16", we_n="A15", cas_n="G16", ras_n="B16", dqm="C16 T15",
