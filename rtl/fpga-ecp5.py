@@ -98,8 +98,8 @@ def HDMIResource(*args, clk_p, clk_n, data_p, data_n, conn=None, attrs=None):
 
 class PaaliaqPlatform(LatticeECP5Platform):
     device      = "LFE5U-25F"
-    package     = "BG381"
-    speed       = "8"
+    package     = "BG256"
+    speed       = "6"
     default_clk = "clk25"
 
 
@@ -109,27 +109,26 @@ class PaaliaqPlatform(LatticeECP5Platform):
 
 
     resources = [
-        Resource("clk25", 0, Pins("P3", dir="i"), Clock(25e6), Attrs(IO_TYPE="LVCMOS33")),
+        Resource("clk25", 0, Pins("P6", dir="i"), Clock(25e6), Attrs(IO_TYPE="LVCMOS33")),
 
-        *LEDResources(pins="U16", invert=True,
+        *LEDResources(pins="B11", invert=True,
                       attrs=Attrs(IO_TYPE="LVCMOS33", DRIVE="4")),
 
         SDRAMResource(0,
-            clk="B9", we_n="A10", cas_n="A9", ras_n="B10",
-            ba="B11 C8", a="B13 C14 A16 A17 B16 B15 A14 A13 A12 A11 B12",
-            dq="B6  A5  A6  A7  C7  B8  B5  A8  D8  D7  E8  D6  C6  D5  E7  C5 "
-               "C10 D9  E11 D11 C11 D12 E9  C12 E14 C15 E13 D15 E12 B17 D14 D13",
+            clk="R15", cke="L16", we_n="A15", cas_n="G16", ras_n="B16", dqm="C16 T15",
+            ba="G15 B14", a="H15 B13 B12 J16 J15 R12 K16 R13 T13 K15 A13 R14 T14",
+            dq="F16 E15 F15 D14 E16 C15 D16 B15 R16 P16 P15 N16 N14 M16 M15 L15",
             attrs=Attrs(PULLMODE="NONE", DRIVE="4", SLEWRATE="FAST", IO_TYPE="LVCMOS33")
         ),
 
-        UARTResource(0, rx="H18", tx="J17"),
+        UARTResource(0, rx="A9", tx="B9"),
 
         HDMIResource(
             0,
-            clk_p="J19", clk_n="K19",
-            data_p="G19 E20 C20",
-            data_n="H20 F19 D19",
-            attrs=Attrs(DRIVE="4", IO_TYPE="LVCMOS33D"),
+            clk_p="E2", clk_n="D3",
+            data_p="G1 J1 L1",
+            data_n="F1 H2 K2",
+            attrs=Attrs(DRIVE="4", IO_TYPE="LVCMOS33"),
         ),
 
         # XXX(qookie): This is not the final pin assignment. I haven't

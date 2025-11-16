@@ -10,18 +10,19 @@ documentation TBD.
 
 ## Specifications
 
-Using the Colorlight 5A-75B (v8.2 specifically) with the following
-specifications as the base FPGA board:
+Using the iCESugar-pro SoM with the following specifications as the
+base FPGA board:
 
  - Lattice ECP5 LFE5U-25F FPGA
- - 8MiB of SDR SDRAM
- - 4MiB SPI flash (holding the bitstream, with free space after it)
- - 2x GbE PHYs (unused for now, plans for use include debug interface
-   and a NIC)
+ - 32MiB of SDR SDRAM
+ - 32MiB SPI flash (holding the bitstream, with free space after it)
+ - SD card slot
+ - RGB led
 
 The project is currently using a soft-core 65C816 implementation, with
-future plans for a daughterboard holding an actual 65C816 chip, and
-breaking out various IO interfaces (UARTs, GPIO, etc).
+future plans for a custom PCB holding an actual 65C816 chip, a SODIMM
+slot for the FPGA SoM and breaking out various IO interfaces (HDMI,
+UARTs, GPIO, etc).
 
 ## How?
 
