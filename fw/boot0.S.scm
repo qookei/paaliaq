@@ -18,7 +18,7 @@
   (.asciz sdram-init-str "SDRAM init...    ")
   (.asciz sdram-init-done-str " done!\r\n")
 
-  (.asciz choices-str "Press: 0 for serial boot, 1 for memory test.\r\n")
+  (.asciz choices-str "Press: 0 for serial boot, 1 for memory test, 2 for UART echo.\r\n")
   (.asciz bad-choice-str "Incorrect selection.\r\n")
 
   (.asciz bye-str "Bye, going to ")
@@ -50,6 +50,9 @@
 	cmp ,(char->integer #\1)
 	beq do-memory-test
 
+	cmp ,(char->integer #\2)
+	beq do-echo
+
 	ldx (imm bad-choice-str)
 	jsr puts
 	jsr video-scroll
@@ -58,7 +61,9 @@
 	#:do-serial-boot
 	jmp serial-boot
 	#:do-memory-test
-	jmp memory-test)
+	jmp memory-test
+	#:do-echo
+	jmp echo)
 
   (proc show-bank .a-bits 16 .xy-bits 16
 	lda #x08
@@ -150,4 +155,11 @@
 	ldx (imm crnl-str)
 	jsr puts
 
-	jml (ind-abs #x0004))))
+	jml (ind-abs #x0004))
+
+
+  (proc echo .a-bits 16 .xy-bits 16
+	#:loop
+	jsr getc
+	jsr putc
+	bra loop)))
