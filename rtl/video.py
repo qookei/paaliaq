@@ -57,7 +57,7 @@ class TextFramebuffer(wiring.Component):
         pll.add_secondary_output(domain="pixel", freq=mode.pixel_clock)
 
         m.submodules.enc = enc = HDMIEncoder()
-        m.submodules.seq = seq = DomainRenamer("pixel")(VideoSequencer(mode, pipeline_depth=2))
+        m.submodules.seq = seq = DomainRenamer("pixel")(VideoSequencer(mode, pipeline_depth=3))
 
         m.d.comb += [
             enc.h_sync.eq(seq.h_sync),
@@ -131,7 +131,7 @@ class TextFramebuffer(wiring.Component):
         in_cursor_line = in_cursor_cell & ((seq.v_pos & 0b1110) == 0b1110) & ((cursor_blink >> 4) & 1)
         bit = in_cursor_line | font_bit
 
-        m.d.comb += Cat(enc.blue, enc.green, enc.red).eq(
+        m.d.pixel += Cat(enc.blue, enc.green, enc.red).eq(
             colors[Mux(bit, delayed(fg, 1), delayed(bg, 1))]
         )
 
