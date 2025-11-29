@@ -135,20 +135,32 @@ class ECP5PLL(Elaboratable):
         ns_shift = 1 / (max_out_MHz * 1e6) * (180 / 360)
         _180_cphase = int(ns_shift * (best_fvco * 1e6))
 
+        # TODO(qookie): ICP_CURRENT seems to be determined dynamically
         pll_params = {
-            "a_ICP_CURRENT": 12,
-            "a_LPF_RESISTOR": 8,
-            "a_MFG_ENABLE_FILTEROPAMP": 1,
-            "a_MFG_GMCREF_SEL": 2,
+            "a_ICP_CURRENT": "6",
+            "a_LPF_RESISTOR": "16",
+            "a_MFG_ENABLE_FILTEROPAMP": "1",
+            "a_MFG_GMCREF_SEL": "2",
+            "p_PLLRST_ENA": "DISABLED",
+            "p_INTFB_WAKE": "DISABLED",
+            "p_STDBY_ENABLE": "DISABLED",
+            "p_DPHASE_SOURCE": "DISABLED",
+            "p_PLL_LOCK_MODE": 0,
+            "p_OUTDIVIDER_MUXA": "DIVA",
+            "p_OUTDIVIDER_MUXB": "DIVB",
+            "p_OUTDIVIDER_MUXC": "DIVC",
+            "p_OUTDIVIDER_MUXD": "DIVD",
         }
 
         # Wire up input clock
         pll_params.update(
             i_CLKI=self._input_clk,
-            a_FREQUENCY_PIN_CLKI=int(self._input_freq // 1e6),
+            a_FREQUENCY_PIN_CLKI=f"{self._input_freq / 1e6}",
             p_CLKI_DIV=best_in_div,
         )
 
+        # TODO(qookie): primary CPHASE seems to be sometimes wrong per Lattice Diamond
+        # It produces correct values for the video PLL, but not the SoC PLL
         assert self._primary.phase == 0 or self._primary.phase == 180, "TODO: phase shift not in {0, 180}"
         primary_cphase = _180_cphase
         if self._primary.phase == 180:
@@ -157,11 +169,13 @@ class ECP5PLL(Elaboratable):
         # Wire up primary output and feedback signals
         pll_params.update(
             o_CLKOP=ClockSignal(self._primary.domain),
-            a_FREQUENCY_PIN_CLKOP=int(self._primary.freq // 1e6),
+            a_FREQUENCY_PIN_CLKOP=f"{self._primary.freq / 1e6}",
             p_CLKOP_ENABLE="ENABLED",
             p_CLKOP_DIV=best_out_div,
             p_CLKOP_CPHASE=primary_cphase,
             p_CLKOP_FPHASE=0,
+            p_CLKOP_TRIM_DELAY=0,
+            p_CLKOP_TRIM_POL="FALLING",
             p_FEEDBK_PATH="CLKOP",
             i_CLKFB=ClockSignal(self._primary.domain),
             p_CLKFB_DIV=best_fb_div,
@@ -169,7 +183,7 @@ class ECP5PLL(Elaboratable):
 
         # Sanity check and wire up all secondary outputs
         for name, secondary in zip(["CLKOS", "CLKOS2", "CLKOS3"], self._secondaries):
-            ratio = self._primary.freq // secondary.freq
+            ratio = int(self._primary.freq // secondary.freq)
             if ratio * secondary.freq != self._primary.freq:
                 raise RuntimeError(
                     f"Primary output frequency {self._primary.freq} is not an integer multiple of "
@@ -189,11 +203,13 @@ class ECP5PLL(Elaboratable):
             # Wire up secondary output
             pll_params.update({
                 f"o_{name}": ClockSignal(secondary.domain),
-                f"a_FREQUENCY_PIN_{name}": int(secondary.freq // 1e6),
+                f"a_FREQUENCY_PIN_{name}": f"{secondary.freq / 1e6}",
                 f"p_{name}_ENABLE": "ENABLED",
                 f"p_{name}_DIV": best_out_div * ratio,
                 f"p_{name}_CPHASE": secondary_cphase,
                 f"p_{name}_FPHASE": 0,
+                f"p_{name}_TRIM_DELAY": 0,
+                f"p_{name}_TRIM_POL": "FALLING",
             })
 
         return pll_params
