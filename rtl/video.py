@@ -1,5 +1,6 @@
 from amaranth import *
 from amaranth.lib import wiring, io, memory
+from amaranth.lib.fifo import AsyncFIFOBuffered
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import csr, wishbone
 from amaranth_soc.memory import MemoryMap
@@ -91,11 +92,6 @@ class TextFramebuffer(wiring.Component):
         cursor_x = Signal(range(128))
         cursor_y = Signal(range(48))
 
-        m.d.sync += [
-            cursor_x.eq(self._cursor.f.x.data),
-            cursor_y.eq(self._cursor.f.y.data),
-        ]
-
         cursor_blink = Signal(range(64))
         with m.If(seq.v_start):
             m.d.pixel += cursor_blink.eq(cursor_blink + 1)
@@ -157,5 +153,29 @@ class TextFramebuffer(wiring.Component):
             m.d.comb += text_wr.en.eq(Mux(self.wb_bus.we, 1 << (self.wb_bus.adr & 1), 0))
             m.d.comb += text_bus_rd.en.eq(~self.wb_bus.we)
             m.d.sync += self.wb_bus.ack.eq(1)
+
+        # ---
+        # Cursor register CDC
+
+        m.submodules.cursor_cdc_fifo = cursor_cdc_fifo = AsyncFIFOBuffered(
+            width=16,
+            depth=8,
+            w_domain="sync",
+            r_domain="pixel")
+
+        stb = self._cursor.f.x.port.w_stb | self._cursor.f.y.port.w_stb
+
+        m.d.comb += [
+            cursor_cdc_fifo.w_data.eq(Cat(self._cursor.f.x.data, self._cursor.f.y.data)),
+            cursor_cdc_fifo.w_en.eq(stb),
+        ]
+
+        with m.If(cursor_cdc_fifo.r_rdy & ~cursor_cdc_fifo.r_en):
+            m.d.pixel += [
+                Cat(cursor_x, cursor_y).eq(cursor_cdc_fifo.r_data),
+                cursor_cdc_fifo.r_en.eq(1),
+            ]
+        with m.Else():
+            m.d.pixel += cursor_cdc_fifo.r_en.eq(0)
 
         return m
