@@ -307,12 +307,12 @@ class HDMIEncoder(wiring.Component):
             enc1.data_in.eq(self.green),
             enc2.data_in.eq(self.red),
             # Wire up shift registers to DDR buffers
-            hdmi_clk_p.o.eq( clk_sr[:2]),
-            hdmi_clk_n.o.eq(~clk_sr[:2]),
+            hdmi_clk_p.o.eq(clk_sr[:2]),
+            hdmi_clk_n.o.eq(clk_sr[:2]),
             hdmi_data_p.o[0].eq(Cat(blue_sr[0], green_sr[0], red_sr[0])),
             hdmi_data_p.o[1].eq(Cat(blue_sr[1], green_sr[1], red_sr[1])),
-            hdmi_data_n.o[0].eq(~Cat(blue_sr[0], green_sr[0], red_sr[0])),
-            hdmi_data_n.o[1].eq(~Cat(blue_sr[1], green_sr[1], red_sr[1])),
+            hdmi_data_n.o[0].eq(Cat(blue_sr[0], green_sr[0], red_sr[0])),
+            hdmi_data_n.o[1].eq(Cat(blue_sr[1], green_sr[1], red_sr[1])),
         ]
 
         return m
