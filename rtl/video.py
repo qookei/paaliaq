@@ -158,15 +158,20 @@ class TextFramebuffer(wiring.Component):
         # Cursor register CDC
 
         m.submodules.cursor_cdc_fifo = cursor_cdc_fifo = AsyncFIFOBuffered(
-            width=16,
-            depth=8,
+            width=13,
+            depth=4,
             w_domain="sync",
             r_domain="pixel")
 
         stb = self._cursor.f.x.port.w_stb | self._cursor.f.y.port.w_stb
 
         m.d.comb += [
-            cursor_cdc_fifo.w_data.eq(Cat(self._cursor.f.x.data, self._cursor.f.y.data)),
+            cursor_cdc_fifo.w_data.eq(
+                Cat(
+                    self._cursor.f.x.data.bit_select(0, 7),
+                    self._cursor.f.y.data.bit_select(0, 6)
+                )
+            ),
             cursor_cdc_fifo.w_en.eq(stb),
         ]
 
