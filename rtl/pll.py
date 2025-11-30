@@ -74,10 +74,11 @@ class ECP5PLL(Elaboratable):
         return m
 
     # Compute PLL parameters for a PLL with the specified configuration.
-    # For now, only supports phase shifts of 0 and 180 degrees.
-    # Logic derived from the ecppll tool from prjtrellis:
+    # Main logic derived from the ecppll tool from prjtrellis:
     # https://github.com/YosysHQ/prjtrellis/blob/master/libtrellis/tools/ecppll.cpp
     # (specifically calc_pll_params, generate_secondary_output)
+    # Phase computation derived from description at https://blog.dave.tf/post/ecp5-pll/
+    # Parameters match PLLs generated in Lattice Diamond 3.14.
     def _compute_pll_params(self):
         PFD_MIN = 3.125
         PFD_MAX = 400
@@ -132,10 +133,41 @@ class ECP5PLL(Elaboratable):
                 f"Failed to find PLL configuration that reaches primary frequency {max_out_MHz * 1e6}"
             )
 
-        ns_shift = 1 / (max_out_MHz * 1e6) * (180 / 360)
-        _180_cphase = int(ns_shift * (best_fvco * 1e6))
+
+        def _compute_phase_params(phase, div):
+            assert phase > -360 and phase < 360, f"Phase {phase} out of bounds"
+
+            coarse_step = 360 / div
+            fine_step = 360 / (8 * div)
+
+            # Truncation rounds towards -inf, which is what we want because
+            # fine phase shift can only add to the total phase.
+            coarse_turns = int(phase / coarse_step)
+            fine_phase = phase - coarse_turns * coarse_step
+
+            # CPHASE has a range [0, 2*(div - 1)], and is biased so that
+            # (div - 1) is 0 deg
+            cphase = coarse_turns + div - 1
+
+            # FPHASE has a range [0, min(127, 8 * div - 1)], with no bias
+            max_fphase = min(127, 8 * div - 1)
+            fphase = int(fine_phase / fine_step)
+
+            assert fphase <= max_fphase, (
+                f"Computed FPHASE {fphase} is larger than maximum {max_fphase} for this divider"
+            )
+
+            computed_phase = (cphase - (div - 1)) * coarse_step + fphase * fine_step
+            assert computed_phase == phase, (
+                f"Failed to meet phase requested phase {phase}, closest is {computed_phase}"
+                f" with CPHASE {cphase} and FPHASE {fphase}"
+            )
+
+            return (cphase, fphase)
+
 
         # TODO(qookie): ICP_CURRENT seems to be determined dynamically
+        # I've seen values 5 and 6 for the two PLLs in this design.
         pll_params = {
             "a_ICP_CURRENT": "6",
             "a_LPF_RESISTOR": "16",
@@ -159,12 +191,7 @@ class ECP5PLL(Elaboratable):
             p_CLKI_DIV=best_in_div,
         )
 
-        # TODO(qookie): primary CPHASE seems to be sometimes wrong per Lattice Diamond
-        # It produces correct values for the video PLL, but not the SoC PLL
-        assert self._primary.phase == 0 or self._primary.phase == 180, "TODO: phase shift not in {0, 180}"
-        primary_cphase = _180_cphase
-        if self._primary.phase == 180:
-            primary_cphase = _180_cphase * 2
+        primary_cphase, primary_fphase = _compute_phase_params(self._primary.phase, best_out_div)
 
         # Wire up primary output and feedback signals
         pll_params.update(
@@ -173,7 +200,7 @@ class ECP5PLL(Elaboratable):
             p_CLKOP_ENABLE="ENABLED",
             p_CLKOP_DIV=best_out_div,
             p_CLKOP_CPHASE=primary_cphase,
-            p_CLKOP_FPHASE=0,
+            p_CLKOP_FPHASE=primary_fphase,
             p_CLKOP_TRIM_DELAY=0,
             p_CLKOP_TRIM_POL="FALLING",
             p_FEEDBK_PATH="CLKOP",
@@ -195,10 +222,7 @@ class ECP5PLL(Elaboratable):
                     f"primary output frequency {self._primary.freq}, divisor {ratio * best_out_div} > 128"
                 )
 
-            assert secondary.phase == 0 or secondary.phase == 180, "TODO: phase shift not in {0, 180}"
-            secondary_cphase = primary_cphase
-            if secondary.phase == 180:
-                secondary_cphase = primary_cphase + _180_cphase
+            secondary_cphase, secondary_fphase = _compute_phase_params(secondary.phase, best_out_div * ratio)
 
             # Wire up secondary output
             pll_params.update({
@@ -207,7 +231,7 @@ class ECP5PLL(Elaboratable):
                 f"p_{name}_ENABLE": "ENABLED",
                 f"p_{name}_DIV": best_out_div * ratio,
                 f"p_{name}_CPHASE": secondary_cphase,
-                f"p_{name}_FPHASE": 0,
+                f"p_{name}_FPHASE": secondary_fphase,
                 f"p_{name}_TRIM_DELAY": 0,
                 f"p_{name}_TRIM_POL": "FALLING",
             })
