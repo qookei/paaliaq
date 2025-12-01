@@ -15,6 +15,8 @@ from uart import UARTPeripheral
 from sdram import SDRAMController, SDRAMSignature
 from mmu import MMU
 
+from wb_cut import WishboneCut
+
 from video import TextFramebuffer
 
 
@@ -128,7 +130,8 @@ class SoC(wiring.Component):
         m.submodules.wb_dec = wb_dec = wishbone.Decoder(addr_width=24, data_width=8)
 
         m.submodules.iram = iram = WishboneSRAM(size=0x10000, data_width=8, init=self._boot_rom)
-        wb_dec.add(iram.wb_bus, addr=0x000000, name='iram')
+        m.submodules.iram_cut = iram_cut = WishboneCut(iram.wb_bus)
+        wb_dec.add(iram_cut.wb_bus, addr=0x000000, name='iram')
 
         m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController(target_clk=self._target_clk)
         wb_dec.add(sdram_ctrl.wb_bus, addr=0x800000, name='sdram')
@@ -164,7 +167,9 @@ class SoC(wiring.Component):
 
         # This freezes the CSR memory map.
         m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)
-        wb_dec.add(csr_wb.wb_bus, addr=0x010000, name='csr')
+        m.submodules.csr_cut = csr_cut = WishboneCut(csr_wb.wb_bus)
+
+        wb_dec.add(csr_cut.wb_bus, addr=0x010000, name='csr')
 
         print_memory_map(wb_dec.bus.memory_map)
 
