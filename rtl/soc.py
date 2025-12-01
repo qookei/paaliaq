@@ -134,7 +134,8 @@ class SoC(wiring.Component):
         wb_dec.add(iram_cut.wb_bus, addr=0x000000, name='iram')
 
         m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController(target_clk=self._target_clk)
-        wb_dec.add(sdram_ctrl.wb_bus, addr=0x800000, name='sdram')
+        m.submodules.sdram_cut = sdram_cut = WishboneCut(sdram_ctrl.wb_bus)
+        wb_dec.add(sdram_cut.wb_bus, addr=0x800000, name='sdram')
         wiring.connect(m, sdram_ctrl.sdram, wiring.flipped(self.sdram))
 
         m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=8, data_width=8)
@@ -162,7 +163,8 @@ class SoC(wiring.Component):
         m.submodules.gen = gen = TextFramebuffer(
             ClockSignal(platform.default_clk),
             platform.default_clk_frequency)
-        wb_dec.add(gen.wb_bus, addr=0x100000, name="text")
+        m.submodules.gen_cut = gen_cut = WishboneCut(gen.wb_bus)
+        wb_dec.add(gen_cut.wb_bus, addr=0x100000, name="text")
         csr_dec.add(gen.csr_bus, name="text")
 
         # This freezes the CSR memory map.
