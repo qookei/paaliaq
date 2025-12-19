@@ -168,7 +168,7 @@ class SDRAMController(wiring.Component):
         write_clks = 2 # tDPL
         write_ctr = Signal(range(write_clks + 1))
 
-        cas_clks = 2
+        cas_clks = 3 if self._target_clk > 100e6 else 2
         read_ctr = Signal(range(cas_clks + 1))
 
         tRES = 64000000

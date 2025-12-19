@@ -2,7 +2,7 @@ SV2V ?= sv2v
 
 
 build/top.bit: *.py external/P65C816.v $(BOOT0_BIN_PATH)
-	PYTHONWARNINGS=all pdm run build-ecp5 --target-clk=100 \
+	PYTHONWARNINGS=all pdm run build-ecp5 --target-clk=150 \
 		--allow-timing-fail --boot-rom $(BOOT0_BIN_PATH)
 
 
