@@ -131,6 +131,7 @@ class ECP5PLL(Elaboratable):
         if best_fout != max_out_MHz:
             raise RuntimeError(
                 f"Failed to find PLL configuration that reaches primary frequency {max_out_MHz * 1e6}"
+                f" (closest found is {best_fout * 1e6})"
             )
 
 
