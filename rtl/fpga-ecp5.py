@@ -30,12 +30,10 @@ class TopLevel(Elaboratable):
         clk_freq = platform.default_clk_frequency
 
         m.domains.sync = cd_sync = ClockDomain("sync")
-        m.domains.sdram = cd_sdram = ClockDomain("sdram")
 
         m.submodules.pll = pll = ECP5PLL()
         pll.add_input(clk=clk.i, freq=clk_freq)
         pll.add_primary_output(freq=self._target_clk)
-        pll.add_secondary_output(domain="sdram", freq=self._target_clk, phase=180)
 
         m.submodules.soc = soc = SoC(target_clk=self._target_clk, boot_rom_path=self._boot_rom_path)
 

@@ -35,7 +35,7 @@ class SDRAMConnector(wiring.Component):
 
         sdram = platform.request("sdram", dir="-")
 
-        m.submodules.clk = clk = io.Buffer("o", sdram.clk)
+        m.submodules.clk = clk = io.DDRBuffer("o", sdram.clk)
         m.submodules.cke = cke = io.Buffer("o", sdram.clk_en)
         m.submodules.ba = ba = io.Buffer("o", sdram.ba)
         m.submodules.a = a = io.Buffer("o", sdram.a)
@@ -46,7 +46,8 @@ class SDRAMConnector(wiring.Component):
         m.submodules.cas = cas = io.Buffer("o", sdram.cas)
 
         m.d.comb += [
-            clk.o.eq(ClockSignal(self._sdram_domain)),
+            clk.o[0].eq(0),
+            clk.o[1].eq(1),
             cke.o.eq(1),
             ba.o.eq(self.sdram.ba),
             a.o.eq(self.sdram.a),
