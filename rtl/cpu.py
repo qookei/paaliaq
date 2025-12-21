@@ -326,6 +326,7 @@ class W65C816WishboneBridge(wiring.Component):
                         self.mmu.vaddr.eq(Cat(self.cpu.addr_lo, self.cpu.addr_hi)),
                         self.mmu.write.eq(~self.cpu.rw),
                         self.mmu.ifetch.eq(self.cpu.vpa),
+                        self.mmu.stb.eq(self.cpu.vda | self.cpu.vpa),
                     ]
                     with m.If(self.cpu.vpa & self.cpu.vda):
                         m.d.sync += insn_ctr.eq(insn_ctr + 1)
@@ -334,16 +335,18 @@ class W65C816WishboneBridge(wiring.Component):
                                 self._dbg_config.f.dbg_enable.set.eq(1),
                                 self._dbg_config.f.dbg_en_next_insn.clear.eq(1),
                             ]
-                    m.next = 'mmu-stb-hi'
-            with m.State('mmu-stb-hi'):
-                m.d.sync += self.mmu.stb.eq(self.cpu.vda | self.cpu.vpa)
-                m.next = 'mmu-stb-lo'
-            with m.State('mmu-stb-lo'):
-                m.d.sync += self.mmu.stb.eq(0)
+                    m.next = 'mmu-wait-valid'
+            with m.State('mmu-wait-valid'):
+                with m.If(~self.mmu.stb | self.mmu.valid):
+                    m.d.sync += self.mmu.stb.eq(0)
 
-                with m.If(write_in_progress):
-                    m.next = 'mmu-stb-lo'
-                with m.Else():
+                    with m.If(write_in_progress):
+                        m.next = 'wait-write-completion'
+                    with m.Else():
+                        m.d.comb += self._dbg_config.f.trace_halted.set.eq(1)
+                        m.next = 'clk-rising-edge'
+            with m.State('wait-write-completion'):
+                with m.If(~write_in_progress):
                     m.d.comb += self._dbg_config.f.trace_halted.set.eq(1)
                     m.next = 'clk-rising-edge'
             with m.State('clk-rising-edge'):

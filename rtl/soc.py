@@ -155,7 +155,8 @@ class SoC(wiring.Component):
         csr_dec.add(evt_monitor.bus, name='intc')
 
         m.submodules.mmu = mmu = MMU()
-        csr_dec.add(mmu.bus, name='mmu')
+        csr_dec.add(mmu.csr_bus, name='mmu')
+        wb_arb.add(mmu.wb_bus)
         wiring.connect(m, cpu_bridge.mmu, mmu.iface)
 
         csr_dec.add(cpu_bridge.csr_bus, name='dbg')
