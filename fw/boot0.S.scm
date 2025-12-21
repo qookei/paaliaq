@@ -1,3 +1,6 @@
+(define TIMER-TIME #x010104)
+(define PMC-CLKS #x010400)
+
 (list
  (.head.text
   (proc _start .a-bits 8 .xy-bits 8
@@ -18,6 +21,9 @@
   (.asciz sdram-init-str "SDRAM init...    ")
   (.asciz sdram-init-done-str " done!\r\n")
 
+  (.asciz pmc-clks-str "CPU clocks=")
+  (.asciz pmc-ms-str " timer ms=")
+
   (.asciz choices-str "Press: 0 for serial boot, 1 for memory test, 2 for UART echo, 3 for MMU test.\r\n")
   (.asciz bad-choice-str "Incorrect selection.\r\n")
 
@@ -36,6 +42,8 @@
 	jsr clear-sdram
 	ldx (imm sdram-init-done-str)
 	jsr puts
+
+	jsr pmc-measure
 
 	#:prompt
 	ldx (imm choices-str)
@@ -169,4 +177,31 @@
 	#:loop
 	jsr getc
 	jsr putc
-	bra loop)))
+	bra loop)
+
+
+  (proc pmc-measure .a-bits 16 .xy-bits 16
+	lda (far-abs ,TIMER-TIME)
+	pha
+	lda (far-abs ,(+ TIMER-TIME 2))
+	pha
+	lda (far-abs ,PMC-CLKS)
+	pha
+	lda (far-abs ,(+ PMC-CLKS 2))
+	pha
+
+	ldx (imm pmc-clks-str)
+	jsr puts
+	pla
+	plx
+	jsr puthex-dword
+
+	ldx (imm pmc-ms-str)
+	jsr puts
+	pla
+	plx
+	jsr puthex-dword
+
+	jsr nl
+	rts))
+ )
