@@ -200,8 +200,8 @@ class SDRAMController(wiring.Component):
 
         byte = self.wb_bus.adr.bit_select(0, 1)
         column = self.wb_bus.adr.bit_select(1, 9)
-        row = self.wb_bus.adr.bit_select(10, 12)
-        bank = self.wb_bus.adr.bit_select(22, 2)
+        row = self.wb_bus.adr.bit_select(10, 13)
+        bank = 0 # TODO(qookie): Use these? self.wb_bus.adr.bit_select(23, 2)
 
         banks_active = Signal(4)
         current_rows = Array([Signal(8) for _ in range(4)])
