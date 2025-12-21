@@ -30,28 +30,28 @@ proc peek {addr} {
 
 
 proc trace_en {} {
-    poke 0x10048 0x04
+    poke 0x10408 0x04
 }
 
 proc trace_dis {} {
-    poke 0x10048 0x00
+    poke 0x10408 0x00
 }
 
 proc trace_do_step {} {
-    poke 0x10048 0x0c
+    poke 0x10408 0x0c
 }
 
 proc trace_step {} {
     # Grab the address and bus state, then tick forward, then grab r/w data
-    set va [peek 0x1004c]
-    set va [expr {$va | ([peek 0x1004d] << 8)}]
-    set va [expr {$va | ([peek 0x1004e] << 16)}]
+    set va [peek 0x1040c]
+    set va [expr {$va | ([peek 0x1040d] << 8)}]
+    set va [expr {$va | ([peek 0x1040e] << 16)}]
 
-    set pa [peek 0x10054]
-    set pa [expr {$pa | ([peek 0x10055] << 8)}]
-    set pa [expr {$pa | ([peek 0x10056] << 16)}]
+    set pa [peek 0x10414]
+    set pa [expr {$pa | ([peek 0x10415] << 8)}]
+    set pa [expr {$pa | ([peek 0x10416] << 16)}]
 
-    set bus [peek 0x10049]
+    set bus [peek 0x10409]
 
     set vpa [expr {$bus & (1 << 0)}]
     set vda [expr {$bus & (1 << 1)}]
@@ -60,8 +60,8 @@ proc trace_step {} {
 
     trace_do_step
 
-    set rdata [peek 0x10051]
-    set wdata [peek 0x10050]
+    set rdata [peek 0x10411]
+    set wdata [peek 0x10410]
 
     format "%06x %s %s%s%s%s %s" \
 	$va \
