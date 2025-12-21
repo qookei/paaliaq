@@ -3,7 +3,7 @@
 
 (define MMIO-BANK #x01)
 
-(define TIMER-TIME #x0014)
+(define TIMER-TIME #x0104)
 
 
 (define (bank-nr addr)

@@ -138,7 +138,7 @@ class SoC(wiring.Component):
         wb_dec.add(sdram_cut.wb_bus, addr=0x800000, name='sdram')
         wiring.connect(m, sdram_ctrl.sdram, wiring.flipped(self.sdram))
 
-        m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=8, data_width=8)
+        m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=12, data_width=8, alignment=8)
 
         m.submodules.uart = uart = UARTPeripheral(target_clk=self._target_clk)
         csr_dec.add(uart.bus, name='uart')

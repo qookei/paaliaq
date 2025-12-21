@@ -5,9 +5,9 @@
  (.text
   (proc video-update-cursor .a-bits 16 .xy-bits 16
 	lda (far-abs video-cursor-x)
-	sta (far-abs #x010060)
+	sta (far-abs #x010500)
 	lda (far-abs video-cursor-y)
-	sta (far-abs #x010062)
+	sta (far-abs #x010502)
 
 	rts)
 
