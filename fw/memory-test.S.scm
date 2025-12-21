@@ -276,22 +276,42 @@
 
 
   (proc rand
-	php .a-bits 16 .xy-bits 16
-	sep #b00100000 .a-bits 8
+	php .a-bits 8 .xy-bits 16
+	rep #b00100000 .a-bits 16
 
-	ldy 8
+	;; x ^= x << 5
 	lda (dp 16)
-
-	#:loop
 	asl (a-reg)
-	rol (dp 17)
-	rol (dp 18)
-	bcc skip-eor
-	eor #x1B
-	#:skip-eor
-	dec (y-reg)
-	bne loop
+	asl (a-reg)
+	asl (a-reg)
+	asl (a-reg)
+	asl (a-reg)
+	eor (dp 16)
 	sta (dp 16)
+
+	;; x ^= x >> 3
+	lsr (a-reg)
+	lsr (a-reg)
+	lsr (a-reg)
+	eor (dp 16)
+	sta (dp 16)
+
+	;; push y
+	lda (dp 18)
+	pha
+
+	;; y ^= y >> 1
+	;; y ^= x
+	lsr (a-reg)
+	eor (dp 18)
+	eor (dp 16)
+	sta (dp 18)
+
+	;; pop x
+	pla
+	sta (dp 16)
+	;; return y
+	lda (dp 18)
 
 	plp rts)
 
@@ -309,11 +329,10 @@
 	jsr puts
 
 	#:fill-loop
-	sep #b00100000 .a-bits 8
 	jsr rand
 	sta (ind-far-dp 0)
-	rep #b00100000 .a-bits 16
 
+	inc (dp 0)
 	inc (dp 0)
 	bne fill-loop
 	inc (dp 2)
@@ -336,12 +355,11 @@
 	sta (dp 18)
 
 	#:test-loop
-	sep #b00100000 .a-bits 8
 	jsr rand
 	cmp (ind-far-dp 0)
-	rep #b00100000 .a-bits 16
 	bne fail
 
+	inc (dp 0)
 	inc (dp 0)
 	bne test-loop
 	inc (dp 2)
@@ -387,11 +405,10 @@
 	jsr puts
 
 	#:fill-loop
-	sep #b00100000 .a-bits 8
 	jsr rand
 	sta (ind-far-dp 0)
-	rep #b00100000 .a-bits 16
 
+	inc (dp 0)
 	inc (dp 0)
 	bne fill-loop
 	inc (dp 2)
@@ -420,12 +437,11 @@
 	sta (dp 18)
 
 	#:test-loop
-	sep #b00100000 .a-bits 8
 	jsr rand
 	cmp (ind-far-dp 0)
-	rep #b00100000 .a-bits 16
 	bne fail
 
+	inc (dp 0)
 	inc (dp 0)
 	bne test-loop
 	inc (dp 2)
