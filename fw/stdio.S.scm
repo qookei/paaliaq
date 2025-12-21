@@ -54,4 +54,11 @@
 	xba
 	jsr puthex-byte
 	pla
-	jmp puthex-byte)))
+	jmp puthex-byte)
+
+  (proc puthex-dword
+	.a-bits 16 .xy-bits 16
+	phx
+	jsr puthex-word
+	pla
+	jmp puthex-word)))
