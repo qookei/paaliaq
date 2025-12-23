@@ -125,6 +125,22 @@ def HDMIResource(*args, clk_p, clk_n, data_p, data_n, conn=None, attrs=None):
         io.append(attrs)
     return Resource.family(*args, default_name='hdmi', ios=io)
 
+
+def SPIResource(*args, cs_n, clk, dq0, dq1, dq2, dq3, conn=None, attrs=None):
+    io = []
+
+    io.append(Subsignal('cs_n', PinsN(cs_n, dir='o', conn=conn, assert_width=1)))
+    if clk is not None:
+        io.append(Subsignal('clk', Pins(clk, dir='o', conn=conn, assert_width=1)))
+    io.append(Subsignal('dq0', Pins(dq0, dir='io', conn=conn)))
+    io.append(Subsignal('dq1', Pins(dq1, dir='io', conn=conn)))
+    io.append(Subsignal('dq2', Pins(dq2, dir='io', conn=conn)))
+    io.append(Subsignal('dq3', Pins(dq3, dir='io', conn=conn)))
+
+    if attrs is not None:
+        io.append(attrs)
+    return Resource.family(*args, default_name='spi', ios=io)
+
 class PaaliaqPlatform(LatticeECP5Platform):
     device      = "LFE5U-25F"
     package     = "BG256"
@@ -161,6 +177,14 @@ class PaaliaqPlatform(LatticeECP5Platform):
             data_p="G1 J1 L1",
             data_n="F1 H2 K2",
             attrs=Attrs(DRIVE="4", IO_TYPE="LVCMOS33"),
+        ),
+
+        SPIResource(
+            0,
+            cs_n="N8",
+            clk=None,
+            dq0="T8", dq1="T7", dq2="M7", dq3="N7",
+            attrs=Attrs(IO_TYPE="LVCMOS33"),
         ),
 
         # XXX(qookie): This is not the final pin assignment. I haven't

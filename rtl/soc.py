@@ -19,6 +19,7 @@ from wb_cut import WishboneCut
 
 from video import TextFramebuffer
 
+from spi import SPIController
 
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
@@ -167,6 +168,9 @@ class SoC(wiring.Component):
         m.submodules.gen_cut = gen_cut = WishboneCut(gen.wb_bus)
         wb_dec.add(gen_cut.wb_bus, addr=0x100000, name="text")
         csr_dec.add(gen.csr_bus, name="text")
+
+        m.submodules.spi = spi = SPIController(target_clk=self._target_clk)
+        csr_dec.add(spi.csr_bus, name="spi")
 
         # This freezes the CSR memory map.
         m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)
