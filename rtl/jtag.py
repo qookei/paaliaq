@@ -13,8 +13,9 @@ from amaranth_soc import wishbone
 # on (or near) TCK negedge by inverting TCK.  To account for JTDO{1,2}
 # being registered on TCK negedge, we have the first data bit ready
 # after JCE{1,2} goes high (=> in Capture-DR state). To account for
-# TDI being registered, we also do shifting in Update-DR, and instead
-# use the negative edge of Update-DR to trigger a FIFO write.
+# TDI being registered, we also do shifting in the cycle Shift-DR ended,
+# and instead use the negative edge of Update-DR to trigger a FIFO write
+# (Shift-DR negedge might not coincide with Update-DR posedge).
 #
 # The interface this component provides is simple: two FIFOs buffering
 # the incoming and outgoing data, with ER2 being the dedicated input
@@ -101,14 +102,17 @@ class JTAGG(wiring.Component):
         with m.If(capture2):
             m.d.jtag += sel.eq(1)
 
-        m.d.comb += tdo.eq(data_sr)
-        with m.If(shift | update):
-            m.d.jtag += data_sr.eq(Cat(data_sr[1:], tdi))
-
         update_d = Signal();
         m.d.jtag += update_d.eq(update)
         update_negedge = update_d & ~update
-        do_write = Signal()
+
+        shift_d = Signal();
+        m.d.jtag += shift_d.eq(shift)
+        shift_negedge = shift_d & ~shift
+
+        m.d.comb += tdo.eq(data_sr)
+        with m.If(shift | shift_negedge):
+            m.d.jtag += data_sr.eq(Cat(data_sr[1:], tdi))
 
         with m.If(update_negedge & sel):
             m.d.jtag += rx_fifo.w_data.eq(data_sr)
