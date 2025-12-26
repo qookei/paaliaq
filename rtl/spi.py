@@ -126,46 +126,26 @@ class SPIController(wiring.Component):
                 m.d.comb += cs.o.eq(0)
 
                 with m.If(self._config.f.kick.data):
-                    m.d.sync += cur_segment.eq(next_segment)
-                    m.d.comb += segment_fifo.r_en.eq(1)
-
-                    with m.If(next_segment.direction == Segment.Direction.TRANSMIT):
-                        m.d.sync += out_sr.eq(tx_fifo.r_data)
-                        m.d.comb += tx_fifo.r_en.eq(1)
-                    with m.Elif(next_segment.direction == Segment.Direction.RECEIVE):
-                        # m.d.sync += in_slip.eq(1)
-                        pass
-
+                    m.d.sync += cur_segment.eq(Segment.const({
+                        "size": 0,
+                        "bit_width": Segment.BitWidth.X1,
+                        "direction": Segment.Direction.NONE,
+                    }))
 
                     m.d.sync += [
-                        bit_ctr.eq(0),
+                        bit_ctr.eq(7),
                         in_sr.eq(0),
                     ]
 
-                    m.next = "clk-0-before-1"
+                    m.next = "clk->0"
 
-            with m.State("clk-0-before-1"):
-                m.d.sync += [
-                    clk.o.eq(0),
-                ]
-
-                with m.If(cur_segment.direction == Segment.Direction.TRANSMIT):
-                    with m.Switch(cur_segment.bit_width):
-                        with m.Case(Segment.BitWidth.X1):
-                            m.d.sync += [
-                                Cat(out_sr, dq0.o).eq(Cat(0, out_sr)),
-                                bit_ctr.eq(bit_ctr + 1),
-                            ]
-
-                m.next = "clk-1"
-
-            with m.State("clk-0-after-1"):
+            with m.State("clk->0"):
                 m.d.sync += [
                     clk.o.eq(0),
                     in_slip.eq(0),
                 ]
 
-                m.next = "clk-1"
+                m.next = "clk->1"
 
                 with m.If(cur_segment.direction == Segment.Direction.TRANSMIT):
                     with m.Switch(cur_segment.bit_width):
@@ -227,9 +207,9 @@ class SPIController(wiring.Component):
                             rx_fifo.w_en.eq(1),
                         ]
 
-            with m.State("clk-1"):
+            with m.State("clk->1"):
                 m.d.sync += clk.o.eq(1)
-                m.next = "clk-0-after-1"
+                m.next = "clk->0"
 
 
         # FIFO CSR interface
