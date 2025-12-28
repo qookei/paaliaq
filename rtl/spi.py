@@ -44,6 +44,8 @@ class SPIController(wiring.Component):
     class ConfigRegister(csr.Register, access="rw"):
         kick: csr.Field(csr.action.RW1S, 1)
         _unused: csr.Field(csr.action.ResR0WA, 7)
+        # SPI clock frequency is computed as:
+        # SoC clock / (2 * (1 + divisor))
         divisor: csr.Field(csr.action.RW, 8)
 
     class TxDataRegister(csr.Register, access="w"):
@@ -129,9 +131,9 @@ class SPIController(wiring.Component):
         bit_max = 8 - bits_per_clk
         bit_ctr = Signal(range(8))
 
-        half_ctr = Signal(9)
-        half_redge = Signal(9)
-        half_mid = Signal(9)
+        half_ctr = Signal(8)
+        half_tgt = Signal(8)
+        half_mid = Signal(8)
 
         oe_stb, tx_stb, rx_stb, advance_stb = Signal(), Signal(), Signal(), Signal()
 
@@ -204,13 +206,11 @@ class SPIController(wiring.Component):
                         m.d.sync += cur_segment.eq(segment_fifo.r_data)
                         m.d.comb += segment_fifo.r_en.eq(1)
 
-                        actual_half = self._config.f.divisor.data + 1
-
                         m.d.sync += [
                             bit_ctr.eq(0),
                             half_ctr.eq(0),
-                            half_redge.eq(actual_half),
-                            half_mid.eq(actual_half // 2),
+                            half_tgt.eq(self._config.f.divisor.data),
+                            half_mid.eq(self._config.f.divisor.data // 2),
                         ]
 
                         m.next = "clk=0"
@@ -222,7 +222,7 @@ class SPIController(wiring.Component):
                 m.d.sync += half_ctr.eq(half_ctr + 1)
 
                 with m.If(~self._config.f.kick.data):
-                    with m.If(half_ctr == half_redge):
+                    with m.If(half_ctr == half_tgt):
                         m.d.sync += half_ctr.eq(0)
                         m.next = "idle"
                 with m.Else():
@@ -232,7 +232,7 @@ class SPIController(wiring.Component):
                     with m.If(half_ctr == half_mid):
                         m.d.comb += tx_stb.eq(1)
 
-                    with m.If(half_ctr == half_redge):
+                    with m.If(half_ctr == half_tgt):
                         m.d.sync += half_ctr.eq(0)
                         m.next = "clk=1"
 
@@ -243,7 +243,7 @@ class SPIController(wiring.Component):
                 with m.If(half_ctr == 0):
                     m.d.comb += rx_stb.eq(1)
 
-                with m.If(half_ctr == half_redge):
+                with m.If(half_ctr == half_tgt):
                     m.d.sync += half_ctr.eq(0)
                     m.d.comb += advance_stb.eq(1)
                     m.next = "clk=0"
