@@ -133,7 +133,23 @@ class SPIController(wiring.Component):
         half_redge = Signal(9)
         half_mid = Signal(9)
 
-        tx_stb, rx_stb, advance_stb = Signal(), Signal(), Signal()
+        oe_stb, tx_stb, rx_stb, advance_stb = Signal(), Signal(), Signal(), Signal()
+
+        with m.If(oe_stb):
+            with m.If(cur_segment.direction == Segment.Direction.TRANSMIT):
+                with m.Switch(cur_segment.bit_width):
+                    with m.Case(Segment.BitWidth.X1):
+                        m.d.sync += dq_oe.eq(0b0001)
+                    with m.Case(Segment.BitWidth.X2):
+                        m.d.sync += dq_oe.eq(0b0011)
+                    with m.Case(Segment.BitWidth.X4):
+                        m.d.sync += dq_oe.eq(0b1111)
+            with m.Else():
+                # Make all IOs tristate when not transmitting.
+                # Transfer width doesn't matter since we don't support sending
+                # and receiving at once.
+                m.d.sync += dq_oe.eq(0b0000)
+
 
         with m.If(tx_stb & (cur_segment.direction == Segment.Direction.TRANSMIT)):
             tx_data = Signal(12)
@@ -178,19 +194,6 @@ class SPIController(wiring.Component):
                         m.d.sync += cur_segment.eq(next_segment)
                         m.d.comb += segment_fifo.r_en.eq(1)
 
-                        with m.If(next_segment.direction == Segment.Direction.TRANSMIT):
-                            with m.Switch(next_segment.bit_width):
-                                with m.Case(Segment.BitWidth.X1):
-                                    m.d.sync += dq_oe.eq(0b0001)
-                                with m.Case(Segment.BitWidth.X2):
-                                    m.d.sync += dq_oe.eq(0b0011)
-                                with m.Case(Segment.BitWidth.X4):
-                                    m.d.sync += dq_oe.eq(0b1111)
-                        with m.Else():
-                            # Make all IOs tristate when not transmitting.
-                            # Transfer width doesn't matter since we don't support sending
-                            # and receiving at once.
-                            m.d.sync += dq_oe.eq(0b0000)
 
         with m.FSM():
             with m.State("idle"):
@@ -223,6 +226,9 @@ class SPIController(wiring.Component):
                         m.d.sync += half_ctr.eq(0)
                         m.next = "idle"
                 with m.Else():
+                    with m.If(half_ctr == 0):
+                        m.d.comb += oe_stb.eq(1)
+
                     with m.If(half_ctr == half_mid):
                         m.d.comb += tx_stb.eq(1)
 
