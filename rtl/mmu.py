@@ -27,12 +27,12 @@ class PageTableEntry(data.Struct):
     present:    1
     writable:   1
     executable: 1
-    _unused:    1
+    user:       1
     pfn:        12
 
 
 def initial_pts():
-    return [{'pfn': i, 'executable': 1, 'writable': 1, 'present': 1} for i in range(1 << 11)]
+    return [{'pfn': i, 'user': 1, 'executable': 1, 'writable': 1, 'present': 1} for i in range(1 << 11)]
 
 class MMU(wiring.Component):
     csr_bus: In(csr.Signature(addr_width=4, data_width=8))
@@ -95,8 +95,6 @@ class MMU(wiring.Component):
             self.wb_bus.we.eq(0),
         ]
 
-        supervisor_page = (self.iface.vaddr & 0x800000) | ((self.iface.vaddr & 0xFFE000) == 0x00E000)
-
         tlb_entry = Signal(PageTableEntry)
 
         pt_low = Signal(8)
@@ -133,7 +131,7 @@ class MMU(wiring.Component):
                 with m.If(tlb_entry.present):
                     abort_write  = self.iface.write  & ~tlb_entry.writable
                     abort_ifetch = self.iface.ifetch & ~tlb_entry.executable
-                    abort_user   = supervisor_page & self.iface.user
+                    abort_user   = self.iface.user   & ~tlb_entry.user
                     abort        = abort_write | abort_ifetch | abort_user
 
                     with m.If(abort):
