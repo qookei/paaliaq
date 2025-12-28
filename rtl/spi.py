@@ -1,10 +1,7 @@
 from amaranth import *
 from amaranth.lib import wiring, io, enum, data
-from amaranth.lib.wiring import In, Out
-from amaranth_soc import wishbone
-from amaranth_soc.memory import MemoryMap
 from amaranth.lib.fifo import SyncFIFOBuffered
-
+from amaranth.lib.wiring import In, Out
 from amaranth_soc import csr
 
 
@@ -47,7 +44,7 @@ class SPIController(wiring.Component):
     class ConfigRegister(csr.Register, access="rw"):
         kick: csr.Field(csr.action.RW1S, 1)
         _unused: csr.Field(csr.action.ResR0WA, 7)
-
+        divisor: csr.Field(csr.action.RW, 8)
 
     class TxDataRegister(csr.Register, access="w"):
         data: csr.Field(csr.action.W, 8)
@@ -97,6 +94,10 @@ class SPIController(wiring.Component):
         m.submodules.dq2 = dq2 = io.Buffer("io", spi.dq2)
         m.submodules.dq3 = dq3 = io.Buffer("io", spi.dq3)
 
+        dq_i  = Cat(dq0.i,  dq1.i,  dq2.i,  dq3.i)
+        dq_o  = Cat(dq0.o,  dq1.o,  dq2.o,  dq3.o)
+        dq_oe = Cat(dq0.oe, dq1.oe, dq2.oe, dq3.oe)
+
         m.submodules.rx_fifo = rx_fifo = SyncFIFOBuffered(width=8, depth=2048)
         m.submodules.tx_fifo = tx_fifo = SyncFIFOBuffered(width=8, depth=2048)
 
@@ -115,73 +116,62 @@ class SPIController(wiring.Component):
 
         out_sr = Signal(8)
         in_sr = Signal(8)
-        in_slip = Signal()
 
-        bit_ctr = Signal(range(8))
-        bit_max = Signal(range(8))
-
+        bits_per_clk = Signal(range(8))
         with m.Switch(cur_segment.bit_width):
             with m.Case(Segment.BitWidth.X1):
-                m.d.comb += bit_max.eq(7)
+                m.d.comb += bits_per_clk.eq(1)
             with m.Case(Segment.BitWidth.X2):
-                m.d.comb += bit_max.eq(6)
+                m.d.comb += bits_per_clk.eq(2)
             with m.Case(Segment.BitWidth.X4):
-                m.d.comb += bit_max.eq(4)
+                m.d.comb += bits_per_clk.eq(4)
 
-        bit_stb = Signal()
-        done_now = Signal()
-        done_next = Signal()
+        bit_max = 8 - bits_per_clk
+        bit_ctr = Signal(range(8))
 
-        with m.If(bit_stb):
-            m.d.sync += in_slip.eq(0)
+        half_ctr = Signal(9)
+        half_redge = Signal(9)
+        half_mid = Signal(9)
 
-            with m.If(cur_segment.direction == Segment.Direction.TRANSMIT):
-                with m.Switch(cur_segment.bit_width):
-                    with m.Case(Segment.BitWidth.X1):
-                        m.d.sync += [
-                            Cat(out_sr, dq0.o).eq(Cat(0, out_sr)),
-                            bit_ctr.eq(bit_ctr + 1),
-                        ]
-                    with m.Case(Segment.BitWidth.X2):
-                        m.d.sync += [
-                            Cat(out_sr, dq0.o, dq1.o).eq(Cat(0, 0, out_sr)),
-                            bit_ctr.eq(bit_ctr + 2),
-                        ]
-                    with m.Case(Segment.BitWidth.X4):
-                        m.d.sync += [
-                            Cat(out_sr, dq0.o, dq1.o, dq2.o, dq3.o).eq(Cat(0, 0, 0, 0, out_sr)),
-                            bit_ctr.eq(bit_ctr + 4),
-                        ]
-            with m.Elif(~in_slip):
-                with m.Switch(cur_segment.bit_width):
-                    with m.Case(Segment.BitWidth.X1):
-                        m.d.sync += [
-                            in_sr.eq(Cat(dq1.i, in_sr)),
-                            bit_ctr.eq(bit_ctr + 1),
-                        ]
-                    with m.Case(Segment.BitWidth.X2):
-                        m.d.sync += [
-                            in_sr.eq(Cat(dq0.i, dq1.i, in_sr)),
-                            bit_ctr.eq(bit_ctr + 2),
-                        ]
-                    with m.Case(Segment.BitWidth.X4):
-                        m.d.sync += [
-                            in_sr.eq(Cat(dq0.i, dq1.i, dq2.i, dq3.i, in_sr)),
-                            bit_ctr.eq(bit_ctr + 4),
-                        ]
+        tx_stb, rx_stb, advance_stb = Signal(), Signal(), Signal()
 
-            # Byte complete
+        with m.If(tx_stb & (cur_segment.direction == Segment.Direction.TRANSMIT)):
+            tx_data = Signal(12)
+            with m.If(bit_ctr == 0):
+                m.d.comb += [
+                    tx_data.eq(tx_fifo.r_data),
+                    tx_fifo.r_en.eq(1),
+                ]
+            with m.Else():
+                m.d.comb += tx_data.eq(out_sr)
+
+            m.d.sync += Cat(out_sr, dq_o).eq(tx_data << bits_per_clk)
+
+
+        m.d.comb += rx_fifo.w_data.eq(in_sr)
+        m.d.sync += rx_fifo.w_en.eq(0)
+        with m.If(rx_stb & (cur_segment.direction == Segment.Direction.RECEIVE)):
             with m.If(bit_ctr == bit_max):
-                # Decrement segment size
+                m.d.sync += rx_fifo.w_en.eq(1)
+
+            with m.Switch(cur_segment.bit_width):
+                with m.Case(Segment.BitWidth.X1):
+                    m.d.sync += in_sr.eq(Cat(dq1.i, in_sr))
+                with m.Case(Segment.BitWidth.X2):
+                    m.d.sync += in_sr.eq(Cat(dq_i[:2], in_sr))
+                with m.Case(Segment.BitWidth.X4):
+                    m.d.sync += in_sr.eq(Cat(dq_i[:4], in_sr))
+
+
+        with m.If(advance_stb):
+            m.d.sync += bit_ctr.eq(bit_ctr + bits_per_clk)
+
+            with m.If(bit_ctr == bit_max):
                 m.d.sync += cur_segment.size.eq(cur_segment.size - 1)
                 # Segment complete
                 with m.If(cur_segment.size == 0):
                     with m.If(~segment_fifo.r_rdy):
                         # No more segments, we're done.
-                        with m.If(cur_segment.direction == Segment.Direction.TRANSMIT):
-                            m.d.sync += done_next.eq(1)
-                        with m.Else():
-                            m.d.comb += done_now.eq(1)
                         m.d.comb += self._config.f.kick.clear.eq(1)
                     with m.Else():
                         # There is a next segment
@@ -189,118 +179,68 @@ class SPIController(wiring.Component):
                         m.d.comb += segment_fifo.r_en.eq(1)
 
                         with m.If(next_segment.direction == Segment.Direction.TRANSMIT):
-                            # If the next segment is transmitting and the previous wasn't,
-                            # we need to prepare the next DQ immediately
-                            with m.If(cur_segment.direction != Segment.Direction.TRANSMIT):
-                                with m.Switch(next_segment.bit_width):
-                                    with m.Case(Segment.BitWidth.X1):
-                                        m.d.sync += [
-                                            Cat(out_sr, dq0.o).eq(Cat(0, tx_fifo.r_data)),
-                                            bit_ctr.eq(1),
-                                        ]
-                                    with m.Case(Segment.BitWidth.X2):
-                                        m.d.sync += [
-                                            Cat(out_sr, dq0.o, dq1.o).eq(Cat(0, 0, tx_fifo.r_data)),
-                                            bit_ctr.eq(2),
-                                        ]
-                                    with m.Case(Segment.BitWidth.X4):
-                                        m.d.sync += [
-                                            Cat(out_sr, dq0.o, dq1.o, dq2.o, dq3.o).eq(Cat(0, 0, 0, 0, tx_fifo.r_data)),
-                                            bit_ctr.eq(4),
-                                        ]
-                                m.d.comb += tx_fifo.r_en.eq(1)
-                            with m.Else():
-                                m.d.sync += out_sr.eq(tx_fifo.r_data)
-                                m.d.comb += tx_fifo.r_en.eq(1)
-                            # Enable outputs on pins used for the transfer
                             with m.Switch(next_segment.bit_width):
                                 with m.Case(Segment.BitWidth.X1):
-                                    m.d.sync += [
-                                        dq0.oe.eq(1),
-                                        dq1.oe.eq(0),
-                                        dq2.oe.eq(0),
-                                        dq3.oe.eq(0),
-                                    ]
+                                    m.d.sync += dq_oe.eq(0b0001)
                                 with m.Case(Segment.BitWidth.X2):
-                                    m.d.sync += [
-                                        dq0.oe.eq(1),
-                                        dq1.oe.eq(1),
-                                        dq2.oe.eq(0),
-                                        dq3.oe.eq(0),
-                                    ]
+                                    m.d.sync += dq_oe.eq(0b0011)
                                 with m.Case(Segment.BitWidth.X4):
-                                    m.d.sync += [
-                                        dq0.oe.eq(1),
-                                        dq1.oe.eq(1),
-                                        dq2.oe.eq(1),
-                                        dq3.oe.eq(1),
-                                    ]
+                                    m.d.sync += dq_oe.eq(0b1111)
                         with m.Else():
-                            # If the next segment is receiving, we need to stall for one bit
-                            # width time to latch the data at the correct time if we were
-                            # transmitting earlier.
-                            # Additionally, handle no-op segments the same way as receive
-                            # segments. This allows us to simplify the logic a tiny bit,
-                            m.d.sync += in_slip.eq(cur_segment.direction == Segment.Direction.TRANSMIT)
-                            # Make all IOs tristate when receiving.
+                            # Make all IOs tristate when not transmitting.
                             # Transfer width doesn't matter since we don't support sending
-                            # and receiving at once
-                            m.d.sync += [
-                                dq0.oe.eq(0),
-                                dq1.oe.eq(0),
-                                dq2.oe.eq(0),
-                                dq3.oe.eq(0),
-                            ]
-
-                with m.Else():
-                    with m.If(cur_segment.direction == Segment.Direction.TRANSMIT):
-                        m.d.sync += out_sr.eq(tx_fifo.r_data)
-                        m.d.comb += tx_fifo.r_en.eq(1)
-
-                with m.If(cur_segment.direction == Segment.Direction.RECEIVE):
-                    m.d.comb += rx_fifo.w_en.eq(1)
-                    with m.Switch(cur_segment.bit_width):
-                        with m.Case(Segment.BitWidth.X1):
-                            m.d.comb += rx_fifo.w_data.eq(Cat(dq1.i, in_sr))
-                        with m.Case(Segment.BitWidth.X2):
-                            m.d.comb += rx_fifo.w_data.eq(Cat(dq0.i, dq1.i, in_sr))
-                        with m.Case(Segment.BitWidth.X4):
-                            m.d.comb += rx_fifo.w_data.eq(Cat(dq0.i, dq1.i, dq2.i, dq3.i, in_sr))
-
+                            # and receiving at once.
+                            m.d.sync += dq_oe.eq(0b0000)
 
         with m.FSM():
             with m.State("idle"):
                 m.d.comb += cs.o.eq(0)
 
                 with m.If(self._config.f.kick.data):
-                    m.d.sync += cur_segment.eq(Segment.const({
-                        "size": 0,
-                        "bit_width": Segment.BitWidth.X1,
-                        "direction": Segment.Direction.NONE,
-                    }))
+                    with m.If(segment_fifo.r_rdy):
+                        m.d.sync += cur_segment.eq(segment_fifo.r_data)
+                        m.d.comb += segment_fifo.r_en.eq(1)
 
-                    m.d.sync += [
-                        bit_ctr.eq(7),
-                        in_sr.eq(0),
-                    ]
+                        actual_half = self._config.f.divisor.data + 1
 
-                    m.next = "clk->0"
+                        m.d.sync += [
+                            bit_ctr.eq(0),
+                            half_ctr.eq(0),
+                            half_redge.eq(actual_half),
+                            half_mid.eq(actual_half // 2),
+                        ]
 
-            with m.State("clk->0"):
-                m.d.sync += clk.o.eq(0)
+                        m.next = "clk=0"
+                    with m.Else():
+                        m.d.comb += self._config.f.kick.clear.eq(1)
 
-                # TODO: Handle divisor
-                m.d.comb += bit_stb.eq(1)
+            with m.State("clk=0"):
+                m.d.comb += clk.o.eq(0)
+                m.d.sync += half_ctr.eq(half_ctr + 1)
 
-                with m.If(done_now | done_next):
-                    m.d.sync += done_next.eq(0)
-                    m.next = "idle"
+                with m.If(~self._config.f.kick.data):
+                    with m.If(half_ctr == half_redge):
+                        m.d.sync += half_ctr.eq(0)
+                        m.next = "idle"
                 with m.Else():
-                    m.next = "clk->1"
+                    with m.If(half_ctr == half_mid):
+                        m.d.comb += tx_stb.eq(1)
 
-            with m.State("clk->1"):
-                m.d.sync += clk.o.eq(1)
-                m.next = "clk->0"
+                    with m.If(half_ctr == half_redge):
+                        m.d.sync += half_ctr.eq(0)
+                        m.next = "clk=1"
+
+            with m.State("clk=1"):
+                m.d.comb += clk.o.eq(1)
+                m.d.sync += half_ctr.eq(half_ctr + 1)
+
+                with m.If(half_ctr == 0):
+                    m.d.comb += rx_stb.eq(1)
+
+                with m.If(half_ctr == half_redge):
+                    m.d.sync += half_ctr.eq(0)
+                    m.d.comb += advance_stb.eq(1)
+                    m.next = "clk=0"
 
 
         # FIFO CSR interface
