@@ -18,6 +18,10 @@
   (.asciz header-str (format #f "\r\n\r\n\r\nPaaliaq boot0, rev ~a.\r\n"
 			     (getenv "GIT_REV")))
 
+  (.asciz hw-rev-str "Running on HW rev ")
+  (.asciz rev-unk-str "<unknown-revision>")
+  (.asciz rev-dirty-str "-dirty")
+
   (.asciz sdram-init-str "SDRAM init...    ")
   (.asciz sdram-init-done-str " done!\r\n")
 
@@ -36,6 +40,8 @@
 
 	ldx (imm header-str)
 	jsr puts
+
+	jsr print-hw-rev
 
 	ldx (imm sdram-init-str)
 	jsr puts
@@ -203,5 +209,45 @@
 	jsr puthex-dword
 
 	jsr nl
-	rts))
+	rts)
+
+
+  (proc print-hw-rev .a-bits 16 .xy-bits 16
+	ldx hw-rev-str
+	jsr puts
+
+	lda (far-abs #x010700)
+	sta (dp 0)
+	lda (far-abs #x010702)
+	sta (dp 2)
+
+	sep #b00100000 .a-bits 8
+	lda (dp 3)
+	rep #b00100000 .a-bits 16
+	bpl unknown
+	jsr puthex-nibble
+	lda (dp 1)
+	jsr puthex-word
+	lda (dp 0)
+	jsr puthex-byte
+
+	sep #b00100000 .a-bits 8
+	bit (dp 3)
+	rep #b00100000 .a-bits 16
+	bvc done
+
+	ldx rev-dirty-str
+	jsr puts
+	bra done
+
+	#:unknown
+	ldx rev-unk-str
+	jsr puts
+
+	#:done
+	jsr nl
+	rts)
+
+
+  )
  )
