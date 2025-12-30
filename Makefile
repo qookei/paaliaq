@@ -9,17 +9,17 @@ export KASFLAGS =
 export KLDFLAGS =
 
 
-all: rtl/build/top.bit fw
+all: $(BUILDDIR)/paaliaq-bitstream.bit fw
 
 .PHONY: program
-program: rtl/build/top.bit
+program: $(BUILDDIR)/paaliaq-bitstream.bit
 	scripts/openocd-program.sh
 
 .PHONY: fw
 fw:
 	cd fw && $(MAKE)
 
-rtl/build/top.bit: fw
+$(BUILDDIR)/paaliaq-bitstream.bit: fw
 	cd rtl && $(MAKE) BOOT0_BIN_PATH=$(BUILDDIR)/boot0.bin
 
 .PHONY: clean
