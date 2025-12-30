@@ -21,6 +21,8 @@ from video import TextFramebuffer
 
 from spi import SPIController
 
+from info import SystemInfo
+
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
 from amaranth_soc.csr.event import EventMonitor
@@ -171,6 +173,9 @@ class SoC(wiring.Component):
 
         m.submodules.spi = spi = SPIController(target_clk=self._target_clk)
         csr_dec.add(spi.csr_bus, name="spi")
+
+        m.submodules.info = info = SystemInfo(target_clk=self._target_clk)
+        csr_dec.add(info.csr_bus, name="info")
 
         # This freezes the CSR memory map.
         m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)
