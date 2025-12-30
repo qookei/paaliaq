@@ -182,6 +182,15 @@
   (proc echo .a-bits 16 .xy-bits 16
 	#:loop
 	jsr getc
+	and #xFF
+
+	;; Perform ICRNL
+	cmp ,(char->integer #\cr)
+	bne just-putc
+	jsr nl
+	bra loop
+
+	#:just-putc
 	jsr putc
 	bra loop)
 
