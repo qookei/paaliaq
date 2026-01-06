@@ -11,19 +11,24 @@ export KLDFLAGS =
 .PHONY: all
 all: fw rtl
 
-.PHONY: rtl fw
-rtl: $(BUILDDIR)/paaliaq-bitstream.bit
-fw: $(BUILDDIR)/boot0.bin
 
 .PHONY: program
 program: $(BUILDDIR)/paaliaq-bitstream.bit
 	scripts/openocd-program.sh
 
-$(BUILDDIR)/boot0.bin:
+.PHONY: fw
+fw:
 	cd fw && $(MAKE)
 
-$(BUILDDIR)/paaliaq-bitstream.bit: $(BUILDDIR)/boot0.bin
+$(BUILDDIR)/boot0.bin: fw
+
+
+.PHONY: rtl
+rtl: $(BUILDDIR)/boot0.bin
 	cd rtl && $(MAKE) BOOT0_BIN_PATH=$(BUILDDIR)/boot0.bin
+
+$(BUILDDIR)/paaliaq-bitstream.bit: rtl
+
 
 .PHONY: clean
 clean:
