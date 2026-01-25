@@ -28,10 +28,9 @@
   (.asciz pmc-clks-str "CPU clocks=")
   (.asciz pmc-ms-str " timer ms=")
 
-  (.asciz choices-str "Press: 0 for serial boot, 1 for memory test, 2 for UART echo, 3 for MMU test.\r\n")
+  (.asciz choices-str "Press: 1 for memory test, 2 for UART echo, 3 for MMU test.\r\n")
   (.asciz bad-choice-str "Incorrect selection.\r\n")
 
-  (.asciz bye-str "Bye, going to ")
   (.asciz crnl-str "\r\n"))
 
  (.text
@@ -58,9 +57,6 @@
 	#:choice
 	jsr getc
 
-	cmp ,(char->integer #\0)
-	beq do-serial-boot
-
 	cmp ,(char->integer #\1)
 	beq do-memory-test
 
@@ -79,8 +75,6 @@
 	jsr video-scroll
 	bra choice
 
-	#:do-serial-boot
-	jmp serial-boot
 	#:do-memory-test
 	jmp memory-test
 	#:do-echo
@@ -137,59 +131,6 @@
 	bne loop
 
 	rts)
-
-
-  (proc serial-boot .a-bits 16 .xy-bits 16
-	;; 0,1,2 - cur ptr
-	;; 4,5,6 - entry ptr
-	;; 8,9 - bytes left
-
-	;; Get load address
-	jsr getc
-	sta (dp 0)
-	sta (dp 4)
-	jsr getc
-	sta (dp 1)
-	sta (dp 5)
-	jsr getc
-	sta (dp 2)
-	sta (dp 6)
-
-	sep #b00100000 .a-bits 8
-	stz (dp 3)
-	stz (dp 7)
-	rep #b00100000 .a-bits 16
-
-	;; Get load size
-	jsr getc
-	sta (dp 8)
-	jsr getc
-	sta (dp 9)
-
-	#:load-loop
-	jsr getc
-	sep #b00100000 .a-bits 8
-	sta (ind-far-dp 0)
-	rep #b00100000 .a-bits 16
-
-	inc (dp 0)
-	bne dec-left
-	inc (dp 2)
-
-	#:dec-left
-	dec (dp 8)
-	bne load-loop
-
-	ldx (imm bye-str)
-	jsr puts
-	lda (dp 6)
-	jsr puthex-byte
-	lda (dp 4)
-	jsr puthex-word
-	ldx (imm crnl-str)
-	jsr puts
-
-	jml (ind-abs #x0004))
 
 
   (proc echo .a-bits 16 .xy-bits 16
