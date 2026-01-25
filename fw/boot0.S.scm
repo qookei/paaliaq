@@ -57,7 +57,6 @@
 
 	#:choice
 	jsr getc
-	and #xFF
 
 	cmp ,(char->integer #\0)
 	beq do-serial-boot
@@ -71,6 +70,10 @@
 	cmp ,(char->integer #\3)
 	beq do-mmu-test
 
+	cmp ,(char->integer #\r)
+	beq maybe-do-zmodem-1
+
+	#:bad-choice
 	ldx (imm bad-choice-str)
 	jsr puts
 	jsr video-scroll
@@ -84,7 +87,17 @@
 	jmp echo
 	#:do-mmu-test
 	jsr mmu-test
-	bra prompt)
+	bra prompt
+	#:maybe-do-zmodem-1
+	jsr getc
+	cmp ,(char->integer #\z)
+	bne bad-choice
+
+	jsr getc
+	cmp ,(char->integer #\return)
+	bne bad-choice
+
+	jmp zmodem-receive)
 
   (proc show-bank .a-bits 16 .xy-bits 16
 	lda #x08
@@ -182,7 +195,6 @@
   (proc echo .a-bits 16 .xy-bits 16
 	#:loop
 	jsr getc
-	and #xFF
 
 	;; Perform ICRNL
 	cmp ,(char->integer #\cr)

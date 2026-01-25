@@ -26,6 +26,22 @@
 	plb plp
 	rts)
 
+  (proc uart-puts .a-bits 16 .xy-bits 16
+	sep #b00100000 .a-bits 8
+
+	#:more
+	lda (x-abs 0)
+	beq done
+	phx
+	jsr uart-putc
+	plx
+	inc (x-reg)
+	bra more
+
+	#:done
+	rep #b00100000 .a-bits 16
+	rts)
+
   (proc uart-getc
 	php phb
 	phe ,(bank-plb MMIO-BANK)

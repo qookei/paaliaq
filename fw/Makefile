@@ -1,6 +1,6 @@
 PRIVDIR = $(BUILDDIR)/fw.p
 
-SRCS = boot0.S.scm uart.S.scm memory-test.S.scm video.S.scm stdio.S.scm mmu.S.scm
+SRCS = boot0.S.scm uart.S.scm memory-test.S.scm video.S.scm stdio.S.scm mmu.S.scm zmodem.S.scm
 OBJS = $(patsubst %.S.scm,$(PRIVDIR)/%.o,$(SRCS))
 
 

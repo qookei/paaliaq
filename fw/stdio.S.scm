@@ -9,8 +9,10 @@
 	jsr video-putc
 	rts)
 
-  (proc getc
-	jmp uart-getc)
+  (proc getc .a-bits 16 .xy-bits 16
+	jsr uart-getc
+	and #xFF
+	rts)
 
 
   (proc puts .a-bits 16 .xy-bits 16
