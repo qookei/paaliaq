@@ -9,7 +9,7 @@ export KASFLAGS =
 export KLDFLAGS =
 
 .PHONY: all
-all: fw rtl
+all: fw kern rtl
 
 
 .PHONY: program
@@ -23,6 +23,13 @@ fw:
 $(BUILDDIR)/boot0.bin: fw
 
 
+.PHONY: kern
+kern:
+	cd kern && $(MAKE)
+
+$(BUILDDIR)/vmpaaliaq.bin: kern
+
+
 .PHONY: rtl
 rtl: $(BUILDDIR)/boot0.bin
 	cd rtl && $(MAKE) BOOT0_BIN_PATH=$(BUILDDIR)/boot0.bin
@@ -33,5 +40,6 @@ $(BUILDDIR)/paaliaq-bitstream.bit: rtl
 .PHONY: clean
 clean:
 	cd fw && $(MAKE) clean
+	cd kern && $(MAKE) clean
 	cd rtl && $(MAKE) clean
 	-rm -r $(BUILDDIR)
