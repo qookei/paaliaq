@@ -1,6 +1,6 @@
 PRIVDIR = $(BUILDDIR)/kern.p
 
-SRCS = entry.S.scm uart.S.scm stdio.S.scm pmm.S.scm
+SRCS = entry.S.scm uart.S.scm stdio.S.scm pmm.S.scm irq.S.scm
 OBJS = $(patsubst %.S.scm,$(PRIVDIR)/%.o,$(SRCS))
 
 

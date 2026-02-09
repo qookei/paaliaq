@@ -24,6 +24,7 @@
   (.asciz hw-rev-str "Running on HW rev ")
   (.asciz rev-unk-str "<unknown-revision>")
   (.asciz rev-dirty-str "-dirty")
+  (.asciz all-done-str "All done for now.\r\n")
 
   (.asciz crnl-str "\r\n"))
 
@@ -44,6 +45,12 @@
 	jsr print-hw-rev
 
 	jsr pmm-init
+	jsr irq-init
+
+	cop #x42
+
+	ldx all-done-str
+	jsr puts
 
 	stp)
 
