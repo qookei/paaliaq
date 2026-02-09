@@ -75,9 +75,9 @@
 	beq again
 	cmp ,(logior #x80 (char->integer #\dc1))
 	beq again
-	cmp ,(char->integer #\dc4)
+	cmp ,(char->integer #\dc3)
 	beq again
-	cmp ,(logior #x80 (char->integer #\dc4))
+	cmp ,(logior #x80 (char->integer #\dc3))
 	beq again
 
 	cmp ,ZDLE
@@ -93,9 +93,9 @@
 	beq again2
 	cmp ,(logior #x80 (char->integer #\dc1))
 	beq again2
-	cmp ,(char->integer #\dc4)
+	cmp ,(char->integer #\dc3)
 	beq again2
-	cmp ,(logior #x80 (char->integer #\dc4))
+	cmp ,(logior #x80 (char->integer #\dc3))
 	beq again2
 
 	;; All the ZCRC* codes
@@ -238,6 +238,7 @@
 	;; Receive ZDATA
 	jsr zmodem-rx-header
 	lda (dp ,hdrbuf)
+	and #xff
 	cmp #x0a
 	beq prepare
 	jmp zmodem-cancel
