@@ -117,8 +117,8 @@ class SystemInfo(wiring.Component):
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         # Temperature register
-        m.submodules.dtr = dtr = ECP5DTR(target_clk=self._target_clk)
-        m.d.comb += self._temp.f.temperature.r_data.eq(dtr.temp)
+        #m.submodules.dtr = dtr = ECP5DTR(target_clk=self._target_clk)
+        m.d.comb += self._temp.f.temperature.r_data.eq(0)
 
         # Git Revision of the RTL
         rev = os.getenv("GIT_REV")
