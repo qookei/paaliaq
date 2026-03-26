@@ -37,6 +37,7 @@ class SDRAMConnector(wiring.Component):
 
         m.submodules.clk = clk = io.DDRBuffer("o", sdram.clk)
         m.submodules.cke = cke = io.Buffer("o", sdram.clk_en)
+        m.submodules.cs = cs = io.Buffer("o", sdram.cs)
         m.submodules.ba = ba = io.Buffer("o", sdram.ba)
         m.submodules.a = a = io.Buffer("o", sdram.a)
         m.submodules.dq = dq = io.Buffer("io", sdram.dq)
@@ -49,6 +50,7 @@ class SDRAMConnector(wiring.Component):
             clk.o[0].eq(0),
             clk.o[1].eq(1),
             cke.o.eq(1),
+            cs.o.eq(1),
             ba.o.eq(self.sdram.ba),
             a.o.eq(self.sdram.a),
             dq.oe.eq(self.sdram.we),
