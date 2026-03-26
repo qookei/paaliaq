@@ -8,7 +8,7 @@ from amaranth_soc.memory import MemoryMap
 from dataclasses import dataclass, field
 
 from hdmi import VideoSequencer, HDMIEncoder, DMT_MODE_1024x768_60Hz
-from pll import ECP5PLL
+from pll import S7MMCM
 
 from font import get_font_data
 
@@ -51,7 +51,7 @@ class TextFramebuffer(wiring.Component):
         m.domains.tmds = cd_tmds = ClockDomain("tmds")
         m.domains.pixel = cd_pixel = ClockDomain("pixel")
 
-        m.submodules.pll = pll = ECP5PLL()
+        m.submodules.pll = pll = S7MMCM()
         pll.add_input(clk=self._in_clk, freq=self._in_freq)
         pll.add_primary_output(domain="tmds", freq=mode.pixel_clock * 5)
         pll.add_secondary_output(domain="pixel", freq=mode.pixel_clock)
