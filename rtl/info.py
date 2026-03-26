@@ -124,7 +124,7 @@ class SystemInfo(wiring.Component):
         rev = os.getenv("GIT_REV")
         if rev is None or rev == "<unknown-rev>":
             print("Warning: Git revision is unknown")
-            m.d.comb += self._rev.f.valid.eq(0)
+            m.d.comb += self._rev.f.valid.r_data.eq(0)
         else:
             rev, *dirty = rev.split("-")
             assert len(rev) == 7
