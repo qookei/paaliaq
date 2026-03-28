@@ -1,5 +1,5 @@
 from amaranth import *
-from amaranth.lib import wiring, io
+from amaranth.lib import wiring, io, enum
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import wishbone
 from amaranth_soc.memory import MemoryMap
@@ -65,6 +65,17 @@ class SDRAMConnector(wiring.Component):
         return m
 
 
+class Command(enum.Enum, shape=3):
+    NOOP           = 0
+    MRS            = 1
+    ACTIVATE       = 2
+    PRECHARGE_BANK = 3
+    PRECHARGE_ALL  = 4
+    READ           = 5
+    WRITE          = 6
+    REFRESH        = 7
+
+
 class SDRAMController(wiring.Component):
     wb_bus: In(wishbone.Signature(addr_width=23, data_width=8))
     sdram: Out(SDRAMSignature())
@@ -80,76 +91,50 @@ class SDRAMController(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        def noop():
-            return [
-                self.sdram.ras.eq(0),
-                self.sdram.cas.eq(0),
-                self.sdram.we.eq(0),
-                self.sdram.dq_o.eq(0),
-            ]
+        bank, address = Signal(2), Signal(13)
 
-        def mode_register_set(cas_latency):
-            return [
-                self.sdram.ras.eq(1),
-                self.sdram.cas.eq(1),
-                self.sdram.we.eq(1),
-                self.sdram.ba.eq(0),
-                # Burst length 1, sequential
-                self.sdram.a.eq(cas_latency << 4),
-            ]
+        cmd_bits = Cat(self.sdram.ras, self.sdram.cas, self.sdram.we)
+        current_cmd = Signal(Command)
+        m.d.sync += current_cmd.eq(Command.NOOP)
 
-        def precharge_all():
-            return [
-                self.sdram.ras.eq(1),
-                self.sdram.cas.eq(0),
-                self.sdram.we.eq(1),
-                self.sdram.a.bit_select(10, 1).eq(1),
-            ]
-
-        def autorefresh():
-            return [
-                self.sdram.ras.eq(1),
-                self.sdram.cas.eq(1),
-                self.sdram.we.eq(0),
-            ]
-
-        def activate_row(bank, row):
-            return [
-                self.sdram.ras.eq(1),
-                self.sdram.cas.eq(0),
-                self.sdram.we.eq(0),
-                self.sdram.ba.eq(bank),
-                self.sdram.a.eq(row),
-            ]
-
-        def read(bank, column):
-            return [
-                self.sdram.ras.eq(0),
-                self.sdram.cas.eq(1),
-                self.sdram.we.eq(0),
-                self.sdram.ba.eq(bank),
-                self.sdram.a.eq(column),
-            ]
-
-        def write(bank, column, data, sel):
-            return [
-                self.sdram.ras.eq(0),
-                self.sdram.cas.eq(1),
-                self.sdram.we.eq(1),
-                self.sdram.ba.eq(bank),
-                self.sdram.dq_o.eq(data),
-                self.sdram.dqm.eq(~sel),
-                self.sdram.a.eq(column),
-            ]
-
-        def precharge(bank):
-            return [
-                self.sdram.ras.eq(1),
-                self.sdram.cas.eq(0),
-                self.sdram.we.eq(1),
-                self.sdram.ba.eq(bank),
-                self.sdram.a.eq(0),
-            ]
+        with m.Switch(current_cmd):
+            with m.Case(Command.NOOP):
+                m.d.comb += cmd_bits.eq(0b000)
+            with m.Case(Command.MRS):
+                m.d.comb += [
+                    cmd_bits.eq(0b111),
+                    self.sdram.a.eq(address),
+                ]
+            with m.Case(Command.ACTIVATE):
+                m.d.comb += [
+                    cmd_bits.eq(0b001),
+                    self.sdram.a.eq(address),
+                    self.sdram.ba.eq(bank),
+                ]
+            with m.Case(Command.PRECHARGE_BANK):
+                m.d.comb += [
+                    cmd_bits.eq(0b101),
+                    self.sdram.ba.eq(bank),
+                ]
+            with m.Case(Command.PRECHARGE_ALL):
+                m.d.comb += [
+                    cmd_bits.eq(0b101),
+                    self.sdram.a.eq(1 << 10),
+                ]
+            with m.Case(Command.READ):
+                m.d.comb += [
+                    cmd_bits.eq(0b010),
+                    self.sdram.a.eq(address),
+                    self.sdram.ba.eq(bank),
+                ]
+            with m.Case(Command.WRITE):
+                m.d.comb += [
+                    cmd_bits.eq(0b110),
+                    self.sdram.a.eq(address),
+                    self.sdram.ba.eq(bank),
+                ]
+            with m.Case(Command.REFRESH):
+                m.d.comb += cmd_bits.eq(0b011)
 
         def ns_to_clks(ns):
             return int(math.ceil(ns * self._target_clk / 1000000000))
@@ -200,10 +185,10 @@ class SDRAMController(wiring.Component):
         trans_ack = Signal()
         m.d.comb += self.wb_bus.ack.eq(trans_ack & self.wb_bus.stb)
 
-        byte = self.wb_bus.adr.bit_select(0, 1)
-        column = self.wb_bus.adr.bit_select(1, 9)
-        row = self.wb_bus.adr.bit_select(10, 13)
-        bank = 0 # TODO(qookie): Use these? self.wb_bus.adr.bit_select(23, 2)
+        byte_wb = self.wb_bus.adr.bit_select(0, 1)
+        column_wb = self.wb_bus.adr.bit_select(1, 9)
+        row_wb = self.wb_bus.adr.bit_select(10, 13)
+        bank_wb = 0 # TODO(qookie): Use these? self.wb_bus.adr.bit_select(23, 2)
 
         banks_active = Signal(4)
         current_rows = Array([Signal(8) for _ in range(4)])
@@ -211,31 +196,28 @@ class SDRAMController(wiring.Component):
         with m.FSM():
             # Initialization states
             with m.State('init-wait'):
-                m.d.sync += noop()
                 m.d.sync += init_ctr.eq(init_ctr + 1)
                 with m.If(init_ctr == init_clks):
                     m.d.sync += precharge_ctr.eq(0)
-                    m.d.sync += precharge_all()
+                    m.d.sync += current_cmd.eq(Command.PRECHARGE_ALL)
                     m.next = 'init-precharge'
             with m.State('init-precharge'):
-                m.d.sync += noop()
                 m.d.sync += precharge_ctr.eq(precharge_ctr + 1)
                 with m.If(precharge_ctr == precharge_clks):
                     m.d.sync += refresh_ctr.eq(0)
-                    m.d.sync += autorefresh()
+                    m.d.sync += current_cmd.eq(Command.REFRESH)
                     m.next = 'init-refresh'
             with m.State('init-refresh'):
-                m.d.sync += noop()
                 m.d.sync += refresh_ctr.eq(refresh_ctr + 1)
                 with m.If(refresh_ctr == refresh_clks):
                     m.d.sync += init_refreshes.eq(init_refreshes + 1)
                     m.d.sync += refresh_ctr.eq(0)
-                    m.d.sync += autorefresh()
+                    m.d.sync += current_cmd.eq(Command.REFRESH)
                     with m.If(init_refreshes == 1):
-                        m.d.sync += mode_register_set(cas_latency=cas_clks)
+                        m.d.sync += current_cmd.eq(Command.MRS)
+                        m.d.sync += address.eq(cas_clks << 4)
                         m.next = 'init-mode-reg'
             with m.State('init-mode-reg'):
-                m.d.sync += noop()
                 m.next = 'init-idle-1'
             with m.State('init-idle-1'):
                 m.next = 'init-idle-2'
@@ -245,92 +227,102 @@ class SDRAMController(wiring.Component):
             with m.State('idle'):
                 m.d.sync += self.sdram.dqm.eq(0)
                 m.d.sync += trans_ack.eq(0)
-                m.d.sync += noop()
                 with m.If(pending_refresh):
                     m.d.sync += pending_refresh.eq(0)
                     with m.If(banks_active.any()):
                         # Precharge before refresh if any bank is not idle.
                         m.d.sync += precharge_ctr.eq(0)
-                        m.d.sync += precharge_all()
+                        m.d.sync += current_cmd.eq(Command.PRECHARGE_ALL)
                         m.next = 'precharge-then-refresh'
                     with m.Else():
                         m.d.sync += refresh_ctr.eq(0)
-                        m.d.sync += autorefresh()
+                        m.d.sync += current_cmd.eq(Command.REFRESH)
                         m.next = 'refresh'
                 with m.Elif(trans_pending):
                     # The target row is already active in the target bank.
-                    with m.If(banks_active.bit_select(bank, 1) & (row == current_rows[bank])):
+                    with m.If(banks_active.bit_select(bank_wb, 1) & (row_wb == current_rows[bank_wb])):
                         # Go do the read/write immediately.
                         with m.If(self.wb_bus.we):
                             m.d.sync += write_ctr.eq(0)
-                            byte_val  = self.wb_bus.dat_w << (byte * 8)
-                            m.d.sync += write(bank, column, byte_val, 1 << byte)
+                            byte_val  = self.wb_bus.dat_w << (byte_wb * 8)
+                            m.d.sync += current_cmd.eq(Command.WRITE)
+                            m.d.sync += bank.eq(bank_wb)
+                            m.d.sync += address.eq(column_wb)
+                            m.d.sync += self.sdram.dq_o.eq(byte_val)
+                            m.d.sync += self.sdram.dqm.eq(~(1<<byte_wb))
                             m.next = 'write-data'
                         with m.Else():
                             m.d.sync += read_ctr.eq(0)
-                            m.d.sync += read(bank, column)
+                            m.d.sync += current_cmd.eq(Command.READ)
+                            m.d.sync += bank.eq(bank_wb)
+                            m.d.sync += address.eq(column_wb)
                             m.next = 'read-data'
                     # The target bank is idle.
-                    with m.Elif(~banks_active.bit_select(bank, 1)):
+                    with m.Elif(~banks_active.bit_select(bank_wb, 1)):
                         # Activate the row and go do the read/write.
                         m.d.sync += activate_ctr.eq(0)
-                        m.d.sync += activate_row(bank, row)
+                        m.d.sync += current_cmd.eq(Command.ACTIVATE)
+                        m.d.sync += bank.eq(bank_wb)
+                        m.d.sync += address.eq(row_wb)
                         m.next = 'activate-row'
                     # The target bank is active but on the wrong row.
                     with m.Else():
                         # Precharge the bank, activate the row, and go do the read/write.
                         m.d.sync += precharge_ctr.eq(0)
-                        m.d.sync += precharge(bank)
+                        m.d.sync += current_cmd.eq(Command.PRECHARGE_BANK)
+                        m.d.sync += bank.eq(bank_wb)
                         m.next = 'precharge-then-activate'
             with m.State('precharge-then-activate'):
-                m.d.sync += noop()
                 m.d.sync += precharge_ctr.eq(precharge_ctr + 1)
                 with m.If(precharge_ctr == precharge_clks):
-                    m.d.sync += banks_active.bit_select(bank, 1).eq(0)
+                    m.d.sync += banks_active.bit_select(bank_wb, 1).eq(0)
                     m.d.sync += activate_ctr.eq(0)
-                    m.d.sync += activate_row(bank, row)
+                    m.d.sync += current_cmd.eq(Command.ACTIVATE)
+                    m.d.sync += bank.eq(bank_wb)
+                    m.d.sync += address.eq(row_wb)
                     m.next = 'activate-row'
             with m.State('activate-row'):
-                m.d.sync += noop()
                 m.d.sync += activate_ctr.eq(activate_ctr + 1)
                 with m.If(activate_ctr == activate_clks):
-                    m.d.sync += banks_active.bit_select(bank, 1).eq(1)
-                    m.d.sync += current_rows[bank].eq(row)
+                    m.d.sync += banks_active.bit_select(bank_wb, 1).eq(1)
+                    m.d.sync += current_rows[bank_wb].eq(row_wb)
                     with m.If(self.wb_bus.we):
                         m.d.sync += write_ctr.eq(0)
-                        byte_val  = self.wb_bus.dat_w << (byte * 8)
-                        m.d.sync += write(bank, column, byte_val, 1 << byte)
+                        byte_val  = self.wb_bus.dat_w << (byte_wb * 8)
+                        m.d.sync += current_cmd.eq(Command.WRITE)
+                        m.d.sync += bank.eq(bank_wb)
+                        m.d.sync += address.eq(column_wb)
+                        m.d.sync += self.sdram.dq_o.eq(byte_val)
+                        m.d.sync += self.sdram.dqm.eq(~(1<<byte_wb))
                         m.next = 'write-data'
                     with m.Else():
                         m.d.sync += read_ctr.eq(0)
-                        m.d.sync += read(bank, column)
+                        m.d.sync += current_cmd.eq(Command.READ)
+                        m.d.sync += bank.eq(bank_wb)
+                        m.d.sync += address.eq(column_wb)
                         m.next = 'read-data'
             with m.State('read-data'):
-                m.d.sync += noop()
                 m.d.sync += read_ctr.eq(read_ctr + 1)
                 with m.If(read_ctr == cas_clks):
-                    m.d.sync += self.wb_bus.dat_r.eq(self.sdram.dq_i.word_select(byte, 8))
+                    m.d.sync += self.wb_bus.dat_r.eq(self.sdram.dq_i.word_select(byte_wb, 8))
                     m.d.sync += trans_ack.eq(1)
                     m.d.sync += trans_pending.eq(0)
                     m.next = 'idle'
             with m.State('write-data'):
-                m.d.sync += noop()
                 m.d.sync += write_ctr.eq(write_ctr + 1)
                 with m.If(write_ctr == write_clks):
-                    m.d.sync += self.sdram.dq_o.eq(0)
+                    #m.d.sync += self.sdram.dq_o.eq(0)
                     m.d.sync += trans_ack.eq(1)
                     m.d.sync += trans_pending.eq(0)
                     m.next = 'idle'
             with m.State('precharge-then-refresh'):
-                m.d.sync += noop()
                 m.d.sync += precharge_ctr.eq(precharge_ctr + 1)
                 with m.If(precharge_ctr == precharge_clks):
                     m.d.sync += banks_active.eq(0)
                     m.d.sync += refresh_ctr.eq(0)
-                    m.d.sync += autorefresh()
+                    m.d.sync += current_cmd.eq(Command.REFRESH)
                     m.next = 'refresh'
             with m.State('refresh'):
-                m.d.sync += noop()
                 m.d.sync += refresh_ctr.eq(refresh_ctr + 1)
                 with m.If(refresh_ctr == refresh_clks):
                     m.next = 'idle'
