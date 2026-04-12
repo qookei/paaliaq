@@ -36,20 +36,20 @@ class SDRAMConnector(wiring.Component):
 
         sdram = platform.request("sdram", dir="-")
 
-        m.submodules.clk = clk = io.DDRBuffer("o", sdram.clk)
-        m.submodules.cke = cke = io.Buffer("o", sdram.clk_en)
-        m.submodules.cs = cs = io.Buffer("o", sdram.cs)
-        m.submodules.ba = ba = io.Buffer("o", sdram.ba)
-        m.submodules.a = a = io.Buffer("o", sdram.a)
-        m.submodules.dq = dq = io.Buffer("io", sdram.dq)
-        m.submodules.dqm = dqm = io.Buffer("o", sdram.dqm)
-        m.submodules.we = we = io.Buffer("o", sdram.we)
-        m.submodules.ras = ras = io.Buffer("o", sdram.ras)
-        m.submodules.cas = cas = io.Buffer("o", sdram.cas)
+        m.submodules.clk = clk = io.DDRBuffer("o", sdram.clk, o_domain="sdram")
+        m.submodules.cke = cke = io.FFBuffer("o", sdram.clk_en)
+        m.submodules.cs = cs = io.FFBuffer("o", sdram.cs)
+        m.submodules.ba = ba = io.FFBuffer("o", sdram.ba)
+        m.submodules.a = a = io.FFBuffer("o", sdram.a)
+        m.submodules.dq = dq = io.FFBuffer("io", sdram.dq)
+        m.submodules.dqm = dqm = io.FFBuffer("o", sdram.dqm)
+        m.submodules.we = we = io.FFBuffer("o", sdram.we)
+        m.submodules.ras = ras = io.FFBuffer("o", sdram.ras)
+        m.submodules.cas = cas = io.FFBuffer("o", sdram.cas)
 
         m.d.comb += [
-            clk.o[0].eq(0),
-            clk.o[1].eq(1),
+            clk.o[0].eq(1),
+            clk.o[1].eq(0),
             cke.o.eq(1),
             cs.o.eq(1),
             ba.o.eq(self.sdram.ba),
@@ -110,42 +110,42 @@ class SDRAMController(wiring.Component):
 
         with m.Switch(current_cmd):
             with m.Case(Command.NOOP):
-                m.d.comb += cmd_bits.eq(0b000)
+                m.d.sync += cmd_bits.eq(0b000)
             with m.Case(Command.MRS):
-                m.d.comb += [
+                m.d.sync += [
                     cmd_bits.eq(0b111),
                     self.sdram.a.eq(address),
                 ]
             with m.Case(Command.ACTIVATE):
-                m.d.comb += [
+                m.d.sync += [
                     cmd_bits.eq(0b001),
                     self.sdram.a.eq(address),
                     self.sdram.ba.eq(bank),
                 ]
             with m.Case(Command.PRECHARGE_BANK):
-                m.d.comb += [
+                m.d.sync += [
                     cmd_bits.eq(0b101),
                     self.sdram.ba.eq(bank),
                 ]
             with m.Case(Command.PRECHARGE_ALL):
-                m.d.comb += [
+                m.d.sync += [
                     cmd_bits.eq(0b101),
                     self.sdram.a.eq(1 << 10),
                 ]
             with m.Case(Command.READ):
-                m.d.comb += [
+                m.d.sync += [
                     cmd_bits.eq(0b010),
                     self.sdram.a.eq(address),
                     self.sdram.ba.eq(bank),
                 ]
             with m.Case(Command.WRITE):
-                m.d.comb += [
+                m.d.sync += [
                     cmd_bits.eq(0b110),
                     self.sdram.a.eq(address),
                     self.sdram.ba.eq(bank),
                 ]
             with m.Case(Command.REFRESH):
-                m.d.comb += cmd_bits.eq(0b011)
+                m.d.sync += cmd_bits.eq(0b011)
 
         m.submodules.tx_fifo = tx_fifo = SyncFIFOBuffered(width=Shape.cast(Transaction).width, depth=4)
         m.submodules.in_fifo = in_fifo = SyncFIFO(width=16, depth=32)
@@ -178,7 +178,7 @@ class SDRAMController(wiring.Component):
         write_ctr = Signal(range(write_clks + 1))
 
         cas_clks = 3 if self._target_clk > 100e6 else 2
-        read_ctr = Signal(range(cas_clks + 1))
+        read_ctr = Signal(range(cas_clks + 2))
 
         tRES = 64000000
         refreshes_per_tRES = 8192
@@ -201,14 +201,17 @@ class SDRAMController(wiring.Component):
         word_ctr = Signal(3)
         in_stb, out_stb = Signal(), Signal()
 
+        m.d.sync += in_fifo.w_en.eq(0)
+        m.d.sync += in_stb.eq(0)
         with m.If(in_stb):
-            m.d.comb += [
+            m.d.sync += [
                 in_fifo.w_data.eq(self.sdram.dq_i),
                 in_fifo.w_en.eq(1),
             ]
 
+        m.d.sync += out_fifo.r_en.eq(0)
         with m.If(out_stb):
-            m.d.comb += [
+            m.d.sync += [
                 self.sdram.dq_o.eq(out_fifo.r_data),
                 out_fifo.r_en.eq(1),
             ]
@@ -348,10 +351,10 @@ class SDRAMController(wiring.Component):
                     ]
 
                 m.d.sync += read_ctr.eq(read_ctr + 1)
-                with m.If(read_ctr == cas_clks - 1):
+                with m.If(read_ctr == cas_clks + 1):
                     m.next = "read-data"
             with m.State("read-data"):
-                m.d.comb += in_stb.eq(1)
+                m.d.sync += in_stb.eq(1)
                 m.d.sync += word_ctr.eq(word_ctr + 1)
                 with m.If(word_ctr == burst_size - 1):
                     m.next = "idle"
