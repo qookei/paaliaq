@@ -168,6 +168,16 @@ class PaaliaqPlatform(XilinxPlatform):
 
     connectors = []
 
+    def toolchain_prepare(self, fragment, name, **kwargs):
+        constraints = """
+        # TODO: explicit create_generated_clock for all PLL clocks
+        # We need the get_clocks instead of just `pixel_clk` because apparently during implementation
+        # that name is lost, and the clock is instead called soc_n_4? hmm...
+        set_clock_groups -asynchronous -group clk -group [get_clocks -of_objects [get_cells -hierarchical seq]]
+        """
+
+        return super().toolchain_prepare(fragment, name, add_constraints=constraints, **kwargs)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
