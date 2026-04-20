@@ -10,6 +10,8 @@ from soc import SoC
 from sdram import SDRAMConnector
 from cpu import W65C816Connector, P65C816SoftCore
 
+from hdmi import DMT_MODE_1024x768_60Hz
+
 from pll import S7MMCM
 
 
@@ -31,11 +33,20 @@ class TopLevel(Elaboratable):
 
         m.domains.sync = cd_sync = ClockDomain("sync")
         m.domains.sdram = cd_sdram = ClockDomain("sdram")
+        m.domains.tmds = cd_tmds = ClockDomain("tmds")
+        m.domains.pixel = cd_pixel = ClockDomain("pixel")
 
-        m.submodules.pll = pll = S7MMCM()
-        pll.add_input(clk=clk.i, freq=clk_freq)
-        pll.add_primary_output(freq=self._target_clk)
-        pll.add_secondary_output(freq=self._target_clk, phase=180, domain="sdram")
+        m.submodules.soc_pll = soc_pll = S7MMCM()
+        soc_pll.add_input(clk=clk.i, freq=clk_freq)
+        soc_pll.add_primary_output(freq=self._target_clk)
+        soc_pll.add_secondary_output(freq=self._target_clk, phase=180, domain="sdram")
+
+        mode = DMT_MODE_1024x768_60Hz
+
+        m.submodules.video_pll = video_pll = S7MMCM()
+        video_pll.add_input(clk=clk.i, freq=clk_freq)
+        video_pll.add_primary_output(freq=mode.pixel_clock * 5, domain="tmds")
+        video_pll.add_secondary_output(freq=mode.pixel_clock, domain="pixel")
 
         m.submodules.soc = soc = SoC(target_clk=self._target_clk, boot_rom_path=self._boot_rom_path)
 
@@ -170,10 +181,12 @@ class PaaliaqPlatform(XilinxPlatform):
 
     def toolchain_prepare(self, fragment, name, **kwargs):
         constraints = """
-        # TODO: explicit create_generated_clock for all PLL clocks
-        # We need the get_clocks instead of just `pixel_clk` because apparently during implementation
-        # that name is lost, and the clock is instead called soc_n_4? hmm...
-        set_clock_groups -asynchronous -group clk -group [get_clocks -of_objects [get_cells -hierarchical seq]]
+        create_generated_clock -name soc_clk [get_pins soc_pll/pll/CLKOUT0]
+        create_generated_clock -name sdram_clk [get_pins soc_pll/pll/CLKOUT1]
+        create_generated_clock -name tmds_clk [get_pins video_pll/pll/CLKOUT0]
+        create_generated_clock -name pixel_clk [get_pins video_pll/pll/CLKOUT1]
+
+        set_clock_groups -asynchronous -group soc_clk -group {pixel_clk tmds_clk}
         """
 
         return super().toolchain_prepare(fragment, name, add_constraints=constraints, **kwargs)

@@ -164,9 +164,7 @@ class SoC(wiring.Component):
 
         csr_dec.add(cpu_bridge.csr_bus, name='dbg')
 
-        m.submodules.gen = gen = TextFramebuffer(
-            ClockSignal(platform.default_clk),
-            platform.default_clk_frequency)
+        m.submodules.gen = gen = TextFramebuffer()
         m.submodules.gen_cut = gen_cut = WishboneCut(gen.wb_bus)
         wb_dec.add(gen_cut.wb_bus, addr=0x100000, name="text")
         csr_dec.add(gen.csr_bus, name="text")
