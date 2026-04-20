@@ -86,7 +86,6 @@ class Transaction(data.Struct):
 
 class SDRAMController(wiring.Component):
     wb_bus: In(wishbone.Signature(addr_width=23, data_width=8))
-    sdram: Out(SDRAMSignature())
 
     def __init__(self, *, target_clk):
         super().__init__()
@@ -99,12 +98,15 @@ class SDRAMController(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
+        m.submodules.sdram_io = sdram_io = platform.get_sdram_ios()
+        sdram_io = sdram_io.sdram
+
         # Command driver
         # --------------
 
         bank, address = Signal(2), Signal(13)
 
-        cmd_bits = Cat(self.sdram.ras, self.sdram.cas, self.sdram.we)
+        cmd_bits = Cat(sdram_io.ras, sdram_io.cas, sdram_io.we)
         current_cmd = Signal(Command)
         m.d.comb += current_cmd.eq(Command.NOOP)
 
@@ -114,35 +116,35 @@ class SDRAMController(wiring.Component):
             with m.Case(Command.MRS):
                 m.d.sync += [
                     cmd_bits.eq(0b111),
-                    self.sdram.a.eq(address),
+                    sdram_io.a.eq(address),
                 ]
             with m.Case(Command.ACTIVATE):
                 m.d.sync += [
                     cmd_bits.eq(0b001),
-                    self.sdram.a.eq(address),
-                    self.sdram.ba.eq(bank),
+                    sdram_io.a.eq(address),
+                    sdram_io.ba.eq(bank),
                 ]
             with m.Case(Command.PRECHARGE_BANK):
                 m.d.sync += [
                     cmd_bits.eq(0b101),
-                    self.sdram.ba.eq(bank),
+                    sdram_io.ba.eq(bank),
                 ]
             with m.Case(Command.PRECHARGE_ALL):
                 m.d.sync += [
                     cmd_bits.eq(0b101),
-                    self.sdram.a.eq(1 << 10),
+                    sdram_io.a.eq(1 << 10),
                 ]
             with m.Case(Command.READ):
                 m.d.sync += [
                     cmd_bits.eq(0b010),
-                    self.sdram.a.eq(address),
-                    self.sdram.ba.eq(bank),
+                    sdram_io.a.eq(address),
+                    sdram_io.ba.eq(bank),
                 ]
             with m.Case(Command.WRITE):
                 m.d.sync += [
                     cmd_bits.eq(0b110),
-                    self.sdram.a.eq(address),
-                    self.sdram.ba.eq(bank),
+                    sdram_io.a.eq(address),
+                    sdram_io.ba.eq(bank),
                 ]
             with m.Case(Command.REFRESH):
                 m.d.sync += cmd_bits.eq(0b011)
@@ -205,14 +207,14 @@ class SDRAMController(wiring.Component):
         m.d.sync += in_stb.eq(0)
         with m.If(in_stb):
             m.d.sync += [
-                in_fifo.w_data.eq(self.sdram.dq_i),
+                in_fifo.w_data.eq(sdram_io.dq_i),
                 in_fifo.w_en.eq(1),
             ]
 
         m.d.sync += out_fifo.r_en.eq(0)
         with m.If(out_stb):
             m.d.sync += [
-                self.sdram.dq_o.eq(out_fifo.r_data),
+                sdram_io.dq_o.eq(out_fifo.r_data),
                 out_fifo.r_en.eq(1),
             ]
 

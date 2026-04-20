@@ -6,13 +6,13 @@ from amaranth_soc.wishbone.sram import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from cpu import W65C816BusSignature, W65C816WishboneBridge
+from cpu import W65C816WishboneBridge
 
 #from jtag import JTAGDebugProbe
 
 from uart import UARTPeripheral
 
-from sdram import SDRAMController, SDRAMSignature
+from sdram import SDRAMController
 from mmu import MMU
 
 from wb_cut import WishboneCut
@@ -106,9 +106,6 @@ def print_memory_map(memory_map, depth=0):
 
 
 class SoC(wiring.Component):
-    cpu: In(W65C816BusSignature())
-    sdram: Out(SDRAMSignature())
-
     tx: Out(1)
     rx: In(1)
 
@@ -139,7 +136,6 @@ class SoC(wiring.Component):
         m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController(target_clk=self._target_clk)
         m.submodules.sdram_cut = sdram_cut = WishboneCut(sdram_ctrl.wb_bus)
         wb_dec.add(sdram_cut.wb_bus, addr=0x800000, name='sdram')
-        wiring.connect(m, sdram_ctrl.sdram, wiring.flipped(self.sdram))
 
         m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=12, data_width=8, alignment=8)
 
@@ -185,7 +181,6 @@ class SoC(wiring.Component):
 
         wiring.connect(m, wb_arb.bus, wb_dec.bus)
 
-        wiring.connect(m, cpu_bridge.cpu, wiring.flipped(self.cpu))
         wiring.connect(m, cpu_bridge.irq, evt_monitor.src)
 
         return m
