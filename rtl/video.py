@@ -22,10 +22,8 @@ class TextFramebuffer(wiring.Component):
         y: csr.Field(csr.action.RW, 16)
 
 
-    def __init__(self, in_clk, in_freq):
+    def __init__(self):
         super().__init__()
-        self._in_clk = in_clk
-        self._in_freq = in_freq
 
         regs = csr.Builder(addr_width=4, data_width=8)
         self._cursor = regs.add("Cursor", self.CursorRegister())
@@ -47,14 +45,6 @@ class TextFramebuffer(wiring.Component):
         # Signal generation logic
 
         mode = DMT_MODE_1024x768_60Hz
-
-        m.domains.tmds = cd_tmds = ClockDomain("tmds")
-        m.domains.pixel = cd_pixel = ClockDomain("pixel")
-
-        m.submodules.pll = pll = S7MMCM()
-        pll.add_input(clk=self._in_clk, freq=self._in_freq)
-        pll.add_primary_output(domain="tmds", freq=mode.pixel_clock * 5)
-        pll.add_secondary_output(domain="pixel", freq=mode.pixel_clock)
 
         m.submodules.enc = enc = HDMIEncoder()
         m.submodules.seq = seq = DomainRenamer("pixel")(VideoSequencer(mode, pipeline_depth=3))
