@@ -99,8 +99,21 @@ class PaaliaqPlatform(XilinxPlatform):
 
         self._w65c816_ios = ios
 
+    def set_boot_spi_clk(self, o, oe):
+        if hasattr(self, "_boot_spi_clk_o") or hasattr(self, "_boot_spi_clk_oe"):
+            raise RuntimeError("Boot SPI clock IOs already set")
+
+        self._boot_spi_clk_o = o
+        self._boot_spi_clk_oe = oe
+
     def get_sdram_ios(self):
         return self._sdram_ios
 
     def get_w65c816_ios(self):
         return self._w65c816_ios
+
+    def get_boot_spi_clk_o(self):
+        return self._boot_spi_clk_o
+
+    def get_boot_spi_clk_oe(self):
+        return self._boot_spi_clk_oe
