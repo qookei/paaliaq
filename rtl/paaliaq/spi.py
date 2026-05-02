@@ -58,7 +58,7 @@ class SPIController(wiring.Component):
         segment: csr.Field(csr.action.W, Segment)
 
 
-    def __init__(self, *, target_clk):
+    def __init__(self):
         super().__init__()
 
         regs = csr.Builder(addr_width=4, data_width=8)
@@ -72,8 +72,6 @@ class SPIController(wiring.Component):
         mmap = regs.as_memory_map()
         self._bridge = csr.Bridge(mmap)
         self.csr_bus.memory_map = mmap
-
-        self._target_clk = target_clk
 
 
     def elaborate(self, platform):

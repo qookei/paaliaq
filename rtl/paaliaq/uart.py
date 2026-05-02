@@ -35,7 +35,7 @@ class UARTPeripheral(wiring.Component):
         data: csr.Field(csr.action.R, 8)
 
 
-    def __init__(self, *, target_clk, baudrate=115200, tx_fifo_depth=16, rx_fifo_depth=16):
+    def __init__(self, *, baudrate=115200, tx_fifo_depth=16, rx_fifo_depth=16):
         super().__init__()
 
         regs = csr.Builder(addr_width=3, data_width=8)
@@ -49,7 +49,6 @@ class UARTPeripheral(wiring.Component):
         self._bridge = csr.Bridge(mmap)
         self.bus.memory_map = mmap
 
-        self._target_clk = target_clk
         self._baudrate = baudrate
         self._tx_fifo_depth = tx_fifo_depth
         self._rx_fifo_depth = rx_fifo_depth
@@ -62,7 +61,7 @@ class UARTPeripheral(wiring.Component):
         wiring.connect(m, wiring.flipped(self.bus), self._bridge.bus)
 
         m.submodules.uart_phy = uart_phy = serial.AsyncSerial(
-            divisor=int(self._target_clk // self._baudrate),
+            divisor=int(platform.soc_clk // self._baudrate),
             data_bits=8, parity=serial.Parity.NONE)
 
         m.submodules.rx_fifo = rx_fifo = SyncFIFOBuffered(width=8, depth=self._rx_fifo_depth)

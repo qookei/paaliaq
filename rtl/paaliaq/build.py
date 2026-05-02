@@ -14,7 +14,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    platform = PaaliaqPlatform()
+    platform = PaaliaqPlatform(
+        soc_clk=args.target_clk * 1e6,
+    )
 
     with open("external/P65C816.v", "r") as f:
         platform.add_file("P65C816.v", f)
@@ -22,7 +24,6 @@ if __name__ == "__main__":
     platform.build(
         PaaliaqTop(
             external_cpu=args.external_cpu,
-            target_clk=args.target_clk * 1e6,
             boot_rom_path=args.boot_rom,
         ),
         build_dir=args.build_dir,

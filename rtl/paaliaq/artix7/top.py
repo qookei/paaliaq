@@ -16,9 +16,8 @@ from paaliaq.sdram import SDRAMConnector
 
 
 class PaaliaqTop(Elaboratable):
-    def __init__(self, *, target_clk=75e6, external_cpu=False, boot_rom_path):
+    def __init__(self, *, external_cpu=False, boot_rom_path):
         super().__init__()
-        self._target_clk = target_clk
         self._external_cpu = external_cpu
         self._boot_rom_path = boot_rom_path
 
@@ -54,7 +53,7 @@ class PaaliaqTop(Elaboratable):
         platform.set_sdram_ios(sdram_conn.sdram)
         platform.set_w65c816_ios(w65c816_conn.iface)
 
-        m.submodules.soc = soc = SoC(target_clk=self._target_clk, boot_rom_path=self._boot_rom_path)
+        m.submodules.soc = soc = SoC(boot_rom_path=self._boot_rom_path)
 
         uart = platform.request("uart", dir="-")
         m.submodules.uart_tx = uart_tx = io.Buffer("o", uart.tx)

@@ -10,9 +10,8 @@ import os, math
 class ECP5DTR(wiring.Component):
     temp: Out(signed(8))
 
-    def __init__(self, target_clk):
+    def __init__(self):
         super().__init__()
-        self._target_clk = target_clk
 
     def elaborate(self, platform):
         m = Module()
@@ -60,7 +59,7 @@ class ECP5DTR(wiring.Component):
         # Generate a trigger every 1ms
 
         def ns_to_clks(ns):
-            return int(math.ceil(ns * self._target_clk / 1000000000))
+            return int(math.ceil(ns * platform.soc_clk / 1000000000))
 
         trig_clks = ns_to_clks(1000000)
         pulse_clks = ns_to_clks(5)
@@ -94,7 +93,7 @@ class SystemInfo(wiring.Component):
         frequency: csr.Field(csr.action.R, 8)
 
 
-    def __init__(self, *, target_clk):
+    def __init__(self):
         super().__init__()
 
         regs = csr.Builder(addr_width=4, data_width=8)
@@ -107,8 +106,6 @@ class SystemInfo(wiring.Component):
         self._bridge = csr.Bridge(mmap)
         self.csr_bus.memory_map = mmap
 
-        self._target_clk = target_clk
-
 
     def elaborate(self, platform):
         m = Module()
@@ -117,7 +114,7 @@ class SystemInfo(wiring.Component):
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         # Temperature register
-        #m.submodules.dtr = dtr = ECP5DTR(target_clk=self._target_clk)
+        #m.submodules.dtr = dtr = ECP5DTR()
         m.d.comb += self._temp.f.temperature.r_data.eq(0)
 
         # Git Revision of the RTL
@@ -136,6 +133,6 @@ class SystemInfo(wiring.Component):
             ]
 
         # SoC clock frequency
-        m.d.comb += self._freq.f.frequency.r_data.eq(int(self._target_clk / 1000000))
+        m.d.comb += self._freq.f.frequency.r_data.eq(int(platform.soc_clk / 1000000))
 
         return m

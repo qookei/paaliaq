@@ -51,10 +51,8 @@ class SystemTimer(wiring.Component):
         deadline: csr.Field(csr.action.RW, 32)
 
 
-    def __init__(self, *, target_clk):
+    def __init__(self):
         regs = csr.Builder(addr_width=4, data_width=8)
-
-        self._target_clk = target_clk
 
         self._config = regs.add("Config", self.ConfigRegister())
         self._time = regs.add("Time", self.TimeRegister(), offset=4)
@@ -76,7 +74,7 @@ class SystemTimer(wiring.Component):
         time = Signal(32)
 
         rate = 1000 # Hz
-        clks_per_tick = int(self._target_clk / rate)
+        clks_per_tick = int(platform.soc_clk / rate)
 
         ctr = Signal(range(clks_per_tick + 1))
 
@@ -109,9 +107,8 @@ class SoC(wiring.Component):
     tx: Out(1)
     rx: In(1)
 
-    def __init__(self, *, target_clk, boot_rom_path):
+    def __init__(self, *, boot_rom_path):
         super().__init__()
-        self._target_clk = target_clk
         self._boot_rom = generate_boot_ram_contents(boot_rom_path)
 
 
@@ -121,7 +118,7 @@ class SoC(wiring.Component):
 
         m.submodules.wb_arb = wb_arb = wishbone.Arbiter(addr_width=24, data_width=8)
 
-        m.submodules.cpu_bridge = cpu_bridge = W65C816WishboneBridge(target_clk=self._target_clk)
+        m.submodules.cpu_bridge = cpu_bridge = W65C816WishboneBridge()
         wb_arb.add(cpu_bridge.wb_bus)
 
         #m.submodules.jtag_debug = jtag_debug = JTAGDebugProbe()
@@ -133,20 +130,20 @@ class SoC(wiring.Component):
         m.submodules.iram_cut = iram_cut = WishboneCut(iram.wb_bus)
         wb_dec.add(iram_cut.wb_bus, addr=0x000000, name='iram')
 
-        m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController(target_clk=self._target_clk)
+        m.submodules.sdram_ctrl = sdram_ctrl = SDRAMController()
         m.submodules.sdram_cut = sdram_cut = WishboneCut(sdram_ctrl.wb_bus)
         wb_dec.add(sdram_cut.wb_bus, addr=0x800000, name='sdram')
 
         m.submodules.csr_dec = csr_dec = csr.Decoder(addr_width=12, data_width=8, alignment=8)
 
-        m.submodules.uart = uart = UARTPeripheral(target_clk=self._target_clk)
+        m.submodules.uart = uart = UARTPeripheral()
         csr_dec.add(uart.bus, name='uart')
         m.d.comb += [
             self.tx.eq(uart.tx),
             uart.rx.eq(self.rx),
         ]
 
-        m.submodules.timer = timer = SystemTimer(target_clk=self._target_clk)
+        m.submodules.timer = timer = SystemTimer()
         csr_dec.add(timer.bus, name='timer')
         evt_map.add(timer.irq)
 
@@ -165,10 +162,10 @@ class SoC(wiring.Component):
         wb_dec.add(gen_cut.wb_bus, addr=0x100000, name="text")
         csr_dec.add(gen.csr_bus, name="text")
 
-        #m.submodules.spi = spi = SPIController(target_clk=self._target_clk)
+        #m.submodules.spi = spi = SPIController()
         #csr_dec.add(spi.csr_bus, name="spi")
 
-        m.submodules.info = info = SystemInfo(target_clk=self._target_clk)
+        m.submodules.info = info = SystemInfo()
         csr_dec.add(info.csr_bus, name="info")
 
         # This freezes the CSR memory map.
