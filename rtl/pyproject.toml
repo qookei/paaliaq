@@ -25,5 +25,4 @@ distribution = false
 
 [tool.pdm.scripts]
 _.env_file = ".env.toolchain"
-build-ecp5 = {cmd = "python -m paaliaq.fpga-ecp5"}
-build-artix7 = {cmd = "python -m paaliaq.fpga-artix7"}
+build-artix7 = {cmd = "python -m paaliaq.build"}
