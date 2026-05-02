@@ -28,7 +28,7 @@
   (.asciz pmc-clks-str "CPU clocks=")
   (.asciz pmc-ms-str " timer ms=")
 
-  (.asciz choices-str "Press: 1 for memory test, 2 for UART echo, 3 for MMU test.\r\n")
+  (.asciz choices-str "Press: 1 for memory test, 2 for UART echo, 3 for MMU test, 4 for SPI test.\r\n")
   (.asciz bad-choice-str "Incorrect selection.\r\n")
 
   (.asciz crnl-str "\r\n"))
@@ -66,6 +66,9 @@
 	cmp ,(char->integer #\3)
 	beq do-mmu-test
 
+	cmp ,(char->integer #\4)
+	beq do-spi-test
+
 	cmp ,(char->integer #\r)
 	beq maybe-do-zmodem-1
 
@@ -81,6 +84,9 @@
 	jmp echo
 	#:do-mmu-test
 	jsr mmu-test
+	bra prompt
+	#:do-spi-test
+	jsr spi-test
 	bra prompt
 	#:maybe-do-zmodem-1
 	jsr getc
