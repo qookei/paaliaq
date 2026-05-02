@@ -153,8 +153,7 @@ class W65C816WishboneBridge(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.cpu_io = cpu_io = platform.get_cpu_ios()
-        cpu_io = cpu_io.iface
+        cpu_io = platform.get_w65c816_ios()
 
         m.submodules.bridge = self._bridge
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)

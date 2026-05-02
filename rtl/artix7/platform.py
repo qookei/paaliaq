@@ -7,6 +7,7 @@ from cpu import P65C816SoftCore
 from resource import *
 from sdram import SDRAMConnector
 
+
 class PaaliaqPlatform(XilinxPlatform):
     device      = "XC7A100T"
     package     = "FGG676"
@@ -74,10 +75,20 @@ class PaaliaqPlatform(XilinxPlatform):
 
         return super().toolchain_prepare(fragment, name, add_constraints=constraints, **kwargs)
 
+    def set_sdram_ios(self, ios):
+        if hasattr(self, "_sdram_ios"):
+            raise RuntimeError("SDRAM IOs already set")
+
+        self._sdram_ios = ios
+
+    def set_w65c816_ios(self, ios):
+        if hasattr(self, "_w65c816_ios"):
+            raise RuntimeError("W65C816 IOs already set")
+
+        self._w65c816_ios = ios
 
     def get_sdram_ios(self):
-        return SDRAMConnector()
+        return self._sdram_ios
 
-
-    def get_cpu_ios(self):
-        return P65C816SoftCore()
+    def get_w65c816_ios(self):
+        return self._w65c816_ios

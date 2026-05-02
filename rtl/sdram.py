@@ -98,8 +98,7 @@ class SDRAMController(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.sdram_io = sdram_io = platform.get_sdram_ios()
-        sdram_io = sdram_io.sdram
+        sdram_io = platform.get_sdram_ios()
 
         # Command driver
         # --------------
