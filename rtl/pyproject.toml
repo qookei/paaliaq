@@ -1,7 +1,7 @@
 [project]
 name = "paaliaq-rtl"
 version = "0.1.0"
-description = "RTL code for the Paaliaq chipset"
+description = "RTL code for Paaliaq"
 authors = [
     {name = "qookie", email = ""},
 ]
@@ -25,4 +25,5 @@ distribution = false
 
 [tool.pdm.scripts]
 _.env_file = ".env.toolchain"
-build-ecp5 = {cmd = "python fpga-ecp5.py"}
+build-ecp5 = {cmd = "python -m paaliaq.fpga-ecp5"}
+build-artix7 = {cmd = "python -m paaliaq.fpga-artix7"}

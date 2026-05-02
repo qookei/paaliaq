@@ -6,15 +6,15 @@ from amaranth.build import *
 from amaranth.vendor import XilinxPlatform
 from amaranth_boards.resources import *
 
-from soc import SoC
+from paaliaq.soc import SoC
 
-from hdmi import DMT_MODE_1024x768_60Hz
+from paaliaq.hdmi import DMT_MODE_1024x768_60Hz
 
-from artix7.pll import S7MMCM
-from artix7.platform import PaaliaqPlatform
+from paaliaq.artix7.pll import S7MMCM
+from paaliaq.artix7.platform import PaaliaqPlatform
 
-from cpu import P65C816SoftCore
-from sdram import SDRAMConnector
+from paaliaq.cpu import P65C816SoftCore
+from paaliaq.sdram import SDRAMConnector
 
 class TopLevel(Elaboratable):
     def __init__(self, *, target_clk=75e6, external_cpu=False, boot_rom_path):

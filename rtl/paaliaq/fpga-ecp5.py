@@ -6,11 +6,11 @@ from amaranth.build import *
 from amaranth.vendor import LatticeECP5Platform
 from amaranth_boards.resources import *
 
-from soc import SoC
-from sdram import SDRAMConnector
-from cpu import W65C816Connector, P65C816SoftCore
+from paaliaq.soc import SoC
+from paaliaq.sdram import SDRAMConnector
+from paaliaq.cpu import W65C816Connector, P65C816SoftCore
 
-from pll import ECP5PLL
+from paaliaq.pll import ECP5PLL
 
 
 class TopLevel(Elaboratable):
