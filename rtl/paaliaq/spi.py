@@ -5,6 +5,73 @@ from amaranth.lib.wiring import In, Out
 from amaranth_soc import csr
 
 
+class SPISignature(wiring.Signature):
+    def __init__(self):
+        super().__init__({
+            "cs":     Out(1),
+            "clk":    Out(1),
+            "clk_oe": Out(1),
+            "dq_i":   In(4),
+            "dq_o":   Out(4),
+            "dq_oe":  Out(4),
+        })
+
+
+class SPIConnector(wiring.Component):
+    spi: In(SPISignature())
+
+    def elaborate(self, platform):
+        m = Module()
+
+        spi = platform.request("spi", dir="-")
+
+        m.submodules.cs = cs = io.Buffer("o", spi.cs_n)
+
+        if hasattr(spi, "clk"):
+            m.submodules.clk = clk = io.Buffer("o", spi.clk)
+            clk_oe = clk.oe
+            clk_o = clk.o
+        else:
+            clk_oe = platform.get_boot_spi_clk_oe()
+            clk_o = platform.get_boot_spi_clk_o()
+
+        assert hasattr(spi, "dq0")
+        assert hasattr(spi, "dq1")
+
+        if hasattr(spi, "dq3"):
+            assert hasattr(spi, "dq2")
+
+            m.submodules.dq0 = dq0 = io.Buffer("io", spi.dq0)
+            m.submodules.dq1 = dq1 = io.Buffer("io", spi.dq1)
+            m.submodules.dq2 = dq2 = io.Buffer("io", spi.dq2)
+            m.submodules.dq3 = dq3 = io.Buffer("io", spi.dq3)
+
+            dq_i  = Cat(dq0.i,  dq1.i,  dq2.i,  dq3.i)
+            dq_o  = Cat(dq0.o,  dq1.o,  dq2.o,  dq3.o)
+            dq_oe = Cat(dq0.oe, dq1.oe, dq2.oe, dq3.oe)
+        else:
+            m.submodules.dq0 = dq0 = io.Buffer("io", spi.dq0)
+            m.submodules.dq1 = dq1 = io.Buffer("io", spi.dq1)
+
+            dummy2_o, dummy2_oe = Signal(), Signal()
+            dummy3_o, dummy3_oe = Signal(), Signal()
+
+            dq_i  = Cat(dq0.i,  dq1.i,  0,  0)
+            dq_o  = Cat(dq0.o,  dq1.o,  dummy2_o,  dummy3_o)
+            dq_oe = Cat(dq0.oe, dq1.oe, dummy2_oe, dummy3_oe)
+
+        m.d.comb += [
+            cs.o.eq(self.spi.cs),
+            clk_o.eq(self.spi.clk),
+            clk_oe.eq(self.spi.clk_oe),
+            self.spi.dq_i.eq(dq_i),
+            dq_o.eq(self.spi.dq_o),
+            dq_oe.eq(self.spi.dq_oe),
+        ]
+
+        return m
+
+
 class ECP5USRMCLK(wiring.Component):
     oe: In(1)
     o:  In(1)
@@ -80,23 +147,8 @@ class SPIController(wiring.Component):
         m.submodules.bridge = self._bridge
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
-        spi = platform.request("spi", dir="-")
-
-        m.submodules.cs = cs = io.Buffer("o", spi.cs_n)
-
-        if hasattr(spi, "clk"):
-            m.submodules.clk = clk = io.Buffer("o", spi.clk)
-        else:
-            m.submodules.clk = clk = ECP5USRMCLK()
-
-        m.submodules.dq0 = dq0 = io.Buffer("io", spi.dq0)
-        m.submodules.dq1 = dq1 = io.Buffer("io", spi.dq1)
-        m.submodules.dq2 = dq2 = io.Buffer("io", spi.dq2)
-        m.submodules.dq3 = dq3 = io.Buffer("io", spi.dq3)
-
-        dq_i  = Cat(dq0.i,  dq1.i,  dq2.i,  dq3.i)
-        dq_o  = Cat(dq0.o,  dq1.o,  dq2.o,  dq3.o)
-        dq_oe = Cat(dq0.oe, dq1.oe, dq2.oe, dq3.oe)
+        m.submodules.conn = conn = SPIConnector()
+        ios = conn.spi
 
         m.submodules.rx_fifo = rx_fifo = SyncFIFOBuffered(width=8, depth=2048)
         m.submodules.tx_fifo = tx_fifo = SyncFIFOBuffered(width=8, depth=2048)
@@ -110,8 +162,8 @@ class SPIController(wiring.Component):
         m.d.comb += next_segment.eq(segment_fifo.r_data)
 
         m.d.comb += [
-            cs.o.eq(1),
-            clk.oe.eq(1),
+            ios.cs.eq(1),
+            ios.clk_oe.eq(1),
         ]
 
         out_sr = Signal(8)
@@ -139,16 +191,16 @@ class SPIController(wiring.Component):
             with m.If(cur_segment.direction == Segment.Direction.TRANSMIT):
                 with m.Switch(cur_segment.bit_width):
                     with m.Case(Segment.BitWidth.X1):
-                        m.d.sync += dq_oe.eq(0b0001)
+                        m.d.sync += ios.dq_oe.eq(0b0001)
                     with m.Case(Segment.BitWidth.X2):
-                        m.d.sync += dq_oe.eq(0b0011)
+                        m.d.sync += ios.dq_oe.eq(0b0011)
                     with m.Case(Segment.BitWidth.X4):
-                        m.d.sync += dq_oe.eq(0b1111)
+                        m.d.sync += ios.dq_oe.eq(0b1111)
             with m.Else():
                 # Make all IOs tristate when not transmitting.
                 # Transfer width doesn't matter since we don't support sending
                 # and receiving at once.
-                m.d.sync += dq_oe.eq(0b0000)
+                m.d.sync += ios.dq_oe.eq(0b0000)
 
 
         with m.If(tx_stb & (cur_segment.direction == Segment.Direction.TRANSMIT)):
@@ -161,7 +213,7 @@ class SPIController(wiring.Component):
             with m.Else():
                 m.d.comb += tx_data.eq(out_sr)
 
-            m.d.sync += Cat(out_sr, dq_o).eq(tx_data << bits_per_clk)
+            m.d.sync += Cat(out_sr, ios.dq_o).eq(tx_data << bits_per_clk)
 
 
         m.d.comb += rx_fifo.w_data.eq(in_sr)
@@ -172,11 +224,11 @@ class SPIController(wiring.Component):
 
             with m.Switch(cur_segment.bit_width):
                 with m.Case(Segment.BitWidth.X1):
-                    m.d.sync += in_sr.eq(Cat(dq1.i, in_sr))
+                    m.d.sync += in_sr.eq(Cat(ios.dq_i[1],  in_sr))
                 with m.Case(Segment.BitWidth.X2):
-                    m.d.sync += in_sr.eq(Cat(dq_i[:2], in_sr))
+                    m.d.sync += in_sr.eq(Cat(ios.dq_i[:2], in_sr))
                 with m.Case(Segment.BitWidth.X4):
-                    m.d.sync += in_sr.eq(Cat(dq_i[:4], in_sr))
+                    m.d.sync += in_sr.eq(Cat(ios.dq_i[:4], in_sr))
 
 
         with m.If(advance_stb):
@@ -197,7 +249,7 @@ class SPIController(wiring.Component):
 
         with m.FSM():
             with m.State("idle"):
-                m.d.comb += cs.o.eq(0)
+                m.d.comb += ios.cs.eq(0)
 
                 with m.If(self._config.f.kick.data):
                     with m.If(segment_fifo.r_rdy):
@@ -216,7 +268,7 @@ class SPIController(wiring.Component):
                         m.d.comb += self._config.f.kick.clear.eq(1)
 
             with m.State("clk=0"):
-                m.d.comb += clk.o.eq(0)
+                m.d.comb += ios.clk.eq(0)
                 m.d.sync += half_ctr.eq(half_ctr + 1)
 
                 with m.If(~self._config.f.kick.data):
@@ -235,7 +287,7 @@ class SPIController(wiring.Component):
                         m.next = "clk=1"
 
             with m.State("clk=1"):
-                m.d.comb += clk.o.eq(1)
+                m.d.comb += ios.clk.eq(1)
                 m.d.sync += half_ctr.eq(half_ctr + 1)
 
                 with m.If(half_ctr == 0):
