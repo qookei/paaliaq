@@ -129,9 +129,8 @@ class W65C816WishboneBridge(wiring.Component):
         _unused: csr.Field(csr.action.ResR0WA, 4)
 
 
-    def __init__(self, *, target_clk):
+    def __init__(self):
         super().__init__()
-        self._target_clk = target_clk
 
         regs = csr.Builder(addr_width=5, data_width=8)
 
@@ -196,7 +195,7 @@ class W65C816WishboneBridge(wiring.Component):
         assert tDHR + tADS <= tPWL, "Min clock low time too short"
 
         def ns_to_cycles(ns):
-            return int((ns * self._target_clk) / 1000000000)
+            return int((ns * platform.soc_clk) / 1000000000)
 
         # Note: times of less than 15ns or so need 1 FPGA clock cycle,
         # so they don't have associated counters, and instead just an

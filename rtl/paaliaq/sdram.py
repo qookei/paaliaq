@@ -87,10 +87,9 @@ class Transaction(data.Struct):
 class SDRAMController(wiring.Component):
     wb_bus: In(wishbone.Signature(addr_width=23, data_width=8))
 
-    def __init__(self, *, target_clk):
+    def __init__(self):
         super().__init__()
 
-        self._target_clk = target_clk
         self.wb_bus.memory_map = MemoryMap(addr_width=23, data_width=8)
         self.wb_bus.memory_map.add_resource(self, name=('mem',), size=(1<<23))
         self.wb_bus.memory_map.freeze()
@@ -160,7 +159,7 @@ class SDRAMController(wiring.Component):
 
 
         def ns_to_clks(ns):
-            return int(math.ceil(ns * self._target_clk / 1000000000))
+            return int(math.ceil(ns * platform.sdram_clk / 1000000000))
 
         init_clks = ns_to_clks(200000)
         init_ctr = Signal(range(init_clks + 1))
@@ -178,7 +177,7 @@ class SDRAMController(wiring.Component):
         write_clks = 2 # tDPL
         write_ctr = Signal(range(write_clks + 1))
 
-        cas_clks = 3 if self._target_clk > 100e6 else 2
+        cas_clks = 3 if platform.sdram_clk > 100e6 else 2
         read_ctr = Signal(range(cas_clks + 2))
 
         tRES = 64000000

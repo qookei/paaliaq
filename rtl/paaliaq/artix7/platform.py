@@ -61,6 +61,12 @@ class PaaliaqPlatform(XilinxPlatform):
 
     connectors = []
 
+    def __init__(self, *, soc_clk):
+        super().__init__()
+
+        self._soc_clk = soc_clk
+        self._sdram_clk = soc_clk
+
     def toolchain_prepare(self, fragment, name, **kwargs):
         constraints = """
         create_generated_clock -name soc_clk [get_pins soc_pll/pll/CLKOUT0]
@@ -72,6 +78,14 @@ class PaaliaqPlatform(XilinxPlatform):
         """
 
         return super().toolchain_prepare(fragment, name, add_constraints=constraints, **kwargs)
+
+    @property
+    def soc_clk(self):
+        return self._soc_clk
+
+    @property
+    def sdram_clk(self):
+        return self._sdram_clk
 
     def set_sdram_ios(self, ios):
         if hasattr(self, "_sdram_ios"):
