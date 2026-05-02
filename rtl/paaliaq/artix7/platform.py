@@ -69,10 +69,10 @@ class PaaliaqPlatform(XilinxPlatform):
 
     def toolchain_prepare(self, fragment, name, **kwargs):
         constraints = """
-        create_generated_clock -name soc_clk [get_pins soc_pll/pll/CLKOUT0]
-        create_generated_clock -name sdram_clk [get_pins soc_pll/pll/CLKOUT1]
-        create_generated_clock -name tmds_clk [get_pins video_pll/pll/CLKOUT0]
-        create_generated_clock -name pixel_clk [get_pins video_pll/pll/CLKOUT1]
+        create_generated_clock -name soc_clk [get_pins crg/soc_pll/pll/CLKOUT0]
+        create_generated_clock -name sdram_clk [get_pins crg/soc_pll/pll/CLKOUT1]
+        create_generated_clock -name tmds_clk [get_pins crg/video_pll/pll/CLKOUT0]
+        create_generated_clock -name pixel_clk [get_pins crg/video_pll/pll/CLKOUT1]
 
         set_clock_groups -asynchronous -group soc_clk -group {pixel_clk tmds_clk}
         """
