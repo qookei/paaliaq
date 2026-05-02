@@ -12,9 +12,13 @@ export KLDFLAGS =
 all: fw kern rtl
 
 
-.PHONY: program
-program: $(BUILDDIR)/paaliaq-bitstream.bit
+.PHONY: program-openocd
+program-openocd: $(BUILDDIR)/paaliaq-bitstream.bit
 	scripts/openocd-program.sh
+
+.PHONY: program-openfpgaloader
+program-openfpgaloader: $(BUILDDIR)/paaliaq-bitstream.bit
+	openFPGALoader -c ft4232 $<
 
 .PHONY: fw
 fw:
