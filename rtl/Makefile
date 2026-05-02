@@ -1,9 +1,9 @@
 SV2V ?= sv2v
 
 
-$(BUILDDIR)/paaliaq-bitstream.bit: *.py external/P65C816.v $(BOOT0_BIN_PATH)
+$(BUILDDIR)/paaliaq-bitstream.bit: paaliaq/*.py external/P65C816.v $(BOOT0_BIN_PATH)
 	mkdir -p $(BUILDDIR)/rtl.p
-	PYTHONWARNINGS=all pdm run build-ecp5 --target-clk=150 \
+	PYTHONWARNINGS=all pdm run build-artix7 --target-clk=200 \
 		--allow-timing-fail --boot-rom $(BOOT0_BIN_PATH) \
 		--build-dir $(BUILDDIR)/rtl.p
 	cp $(BUILDDIR)/rtl.p/top.bit $(BUILDDIR)/paaliaq-bitstream.bit
