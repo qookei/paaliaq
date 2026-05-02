@@ -13,6 +13,8 @@ from hdmi import DMT_MODE_1024x768_60Hz
 from artix7.pll import S7MMCM
 from artix7.platform import PaaliaqPlatform
 
+from cpu import P65C816SoftCore
+from sdram import SDRAMConnector
 
 class TopLevel(Elaboratable):
     def __init__(self, *, target_clk=75e6, external_cpu=False, boot_rom_path):
@@ -46,6 +48,12 @@ class TopLevel(Elaboratable):
         video_pll.add_input(clk=clk.i, freq=clk_freq)
         video_pll.add_primary_output(freq=mode.pixel_clock * 5, domain="tmds")
         video_pll.add_secondary_output(freq=mode.pixel_clock, domain="pixel")
+
+        m.submodules.sdram_conn = sdram_conn = SDRAMConnector()
+        m.submodules.w65c816_conn = w65c816_conn = P65C816SoftCore()
+
+        platform.set_sdram_ios(sdram_conn.sdram)
+        platform.set_w65c816_ios(w65c816_conn.iface)
 
         m.submodules.soc = soc = SoC(target_clk=self._target_clk, boot_rom_path=self._boot_rom_path)
 
