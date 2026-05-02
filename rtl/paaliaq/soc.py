@@ -6,22 +6,22 @@ from amaranth_soc.wishbone.sram import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from cpu import W65C816WishboneBridge
+from paaliaq.cpu import W65C816WishboneBridge
 
-#from jtag import JTAGDebugProbe
+#from paaliaq.jtag import JTAGDebugProbe
 
-from uart import UARTPeripheral
+from paaliaq.uart import UARTPeripheral
 
-from sdram import SDRAMController
-from mmu import MMU
+from paaliaq.sdram import SDRAMController
+from paaliaq.mmu import MMU
 
-from wb_cut import WishboneCut
+from paaliaq.wb_cut import WishboneCut
 
-from video import TextFramebuffer
+from paaliaq.video import TextFramebuffer
 
-from spi import SPIController
+from paaliaq.spi import SPIController
 
-from info import SystemInfo
+from paaliaq.info import SystemInfo
 
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge

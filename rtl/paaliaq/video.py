@@ -7,10 +7,10 @@ from amaranth_soc.memory import MemoryMap
 
 from dataclasses import dataclass, field
 
-from hdmi import VideoSequencer, HDMIEncoder, DMT_MODE_1024x768_60Hz
-from pll import S7MMCM
+from paaliaq.hdmi import VideoSequencer, HDMIEncoder, DMT_MODE_1024x768_60Hz
+from paaliaq.pll import S7MMCM
 
-from font import get_font_data
+from paaliaq.font import get_font_data
 
 
 class TextFramebuffer(wiring.Component):

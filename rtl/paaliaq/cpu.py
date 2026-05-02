@@ -3,7 +3,7 @@ from amaranth.lib import wiring, io
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import wishbone, event, csr
 
-from mmu import MMUSignature
+from paaliaq.mmu import MMUSignature
 
 class W65C816BusSignature(wiring.Signature):
     def __init__(self):

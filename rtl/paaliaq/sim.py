@@ -2,9 +2,9 @@ from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 
-from soc import SoC
-from cpu import P65C816SoftCore
-from sdram import SDRAMSignature
+from paaliaq.soc import SoC
+from paaliaq.cpu import P65C816SoftCore
+from paaliaq.sdram import SDRAMSignature
 
 
 class TopLevel(wiring.Component):

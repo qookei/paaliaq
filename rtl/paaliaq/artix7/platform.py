@@ -3,9 +3,7 @@ from amaranth.build import *
 from amaranth.vendor import XilinxPlatform
 from amaranth_boards.resources import *
 
-from cpu import P65C816SoftCore
-from resource import *
-from sdram import SDRAMConnector
+from paaliaq.resource import *
 
 
 class PaaliaqPlatform(XilinxPlatform):
