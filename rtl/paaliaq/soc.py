@@ -162,8 +162,8 @@ class SoC(wiring.Component):
         wb_dec.add(gen_cut.wb_bus, addr=0x100000, name="text")
         csr_dec.add(gen.csr_bus, name="text")
 
-        #m.submodules.spi = spi = SPIController()
-        #csr_dec.add(spi.csr_bus, name="spi")
+        m.submodules.spi = spi = SPIController()
+        csr_dec.add(spi.csr_bus, name="spi")
 
         m.submodules.info = info = SystemInfo()
         csr_dec.add(info.csr_bus, name="info")

@@ -28,8 +28,17 @@ class PaaliaqTop(Elaboratable):
         m.submodules.sdram_conn = sdram_conn = SDRAMConnector()
         m.submodules.w65c816_conn = w65c816_conn = P65C816SoftCore()
 
+        spi_clk_o, spi_clk_oe = Signal(), Signal()
+
+        m.submodules.startupe2 = Instance(
+            "STARTUPE2",
+            i_USRCCLKO=spi_clk_o,
+            i_USRCCLKTS=~spi_clk_oe,
+        )
+
         platform.set_sdram_ios(sdram_conn.sdram)
         platform.set_w65c816_ios(w65c816_conn.iface)
+        platform.set_boot_spi_clk(spi_clk_o, spi_clk_oe)
 
         m.submodules.soc = soc = SoC(boot_rom_path=self._boot_rom_path)
 
