@@ -36,19 +36,15 @@ class PaaliaqTop(Elaboratable):
             i_USRCCLKTS=~spi_clk_oe,
         )
 
+        uart = platform.request("uart", dir="-")
+        m.submodules.uart_rx = uart_rx = io.Buffer("i", uart.rx)
+        m.submodules.uart_tx = uart_tx = io.Buffer("o", uart.tx)
+
         platform.set_sdram_ios(sdram_conn.sdram)
         platform.set_w65c816_ios(w65c816_conn.iface)
         platform.set_boot_spi_clk(spi_clk_o, spi_clk_oe)
+        platform.add_uart(uart_rx, uart_tx)
 
         m.submodules.soc = soc = SoC(boot_rom_path=self._boot_rom_path)
-
-        uart = platform.request("uart", dir="-")
-        m.submodules.uart_tx = uart_tx = io.Buffer("o", uart.tx)
-        m.submodules.uart_rx = uart_rx = io.Buffer("i", uart.rx)
-
-        m.d.comb += [
-            uart_tx.o.eq(soc.tx),
-            soc.rx.eq(uart_rx.i),
-        ]
 
         return m
