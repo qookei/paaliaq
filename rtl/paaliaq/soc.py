@@ -103,14 +103,10 @@ def print_memory_map(memory_map, depth=0):
         print(f' - [{resource.start:#010x}, {resource.end:#010x}) - {path}')
 
 
-class SoC(wiring.Component):
-    tx: Out(1)
-    rx: In(1)
-
+class SoC(Elaboratable):
     def __init__(self, *, boot_rom_path):
         super().__init__()
         self._boot_rom = generate_boot_ram_contents(boot_rom_path)
-
 
     def elaborate(self, platform):
         m = Module()
@@ -138,10 +134,6 @@ class SoC(wiring.Component):
 
         m.submodules.uart = uart = UARTPeripheral()
         csr_dec.add(uart.bus, name='uart')
-        m.d.comb += [
-            self.tx.eq(uart.tx),
-            uart.rx.eq(self.rx),
-        ]
 
         m.submodules.timer = timer = SystemTimer()
         csr_dec.add(timer.bus, name='timer')

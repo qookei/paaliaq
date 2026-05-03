@@ -1,3 +1,5 @@
+from collections import deque, namedtuple
+
 from amaranth import *
 from amaranth.build import *
 from amaranth.vendor import XilinxPlatform
@@ -66,6 +68,7 @@ class PaaliaqPlatform(XilinxPlatform):
 
         self._soc_clk = soc_clk
         self._sdram_clk = soc_clk
+        self._uarts = deque()
 
     def toolchain_prepare(self, fragment, name, **kwargs):
         constraints = """
@@ -106,6 +109,10 @@ class PaaliaqPlatform(XilinxPlatform):
         self._boot_spi_clk_o = o
         self._boot_spi_clk_oe = oe
 
+    def add_uart(self, rx, tx):
+        ty = namedtuple("UartPins", "rx, tx")
+        self._uarts.append(ty(rx, tx))
+
     def get_sdram_ios(self):
         return self._sdram_ios
 
@@ -117,3 +124,6 @@ class PaaliaqPlatform(XilinxPlatform):
 
     def get_boot_spi_clk_oe(self):
         return self._boot_spi_clk_oe
+
+    def get_uart(self):
+        return self._uarts.popleft()

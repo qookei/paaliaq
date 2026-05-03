@@ -2,7 +2,6 @@ from amaranth import *
 from amaranth.lib import wiring
 from amaranth.lib.wiring import In, Out
 from amaranth.lib.fifo import SyncFIFOBuffered
-from amaranth.lib.cdc import FFSynchronizer
 
 from amaranth_soc import csr
 
@@ -13,9 +12,6 @@ from amaranth_stdio import serial
 # is done for us by serial.AsyncSerial.
 class UARTPeripheral(wiring.Component):
     bus: In(csr.Signature(addr_width=3, data_width=8))
-
-    tx: Out(1)
-    rx: In(1)
 
     class ConfigRegister(csr.Register, access="rw"):
         _unused: csr.Field(csr.action.ResR0WA, 8)
@@ -62,7 +58,8 @@ class UARTPeripheral(wiring.Component):
 
         m.submodules.uart_phy = uart_phy = serial.AsyncSerial(
             divisor=int(platform.soc_clk // self._baudrate),
-            data_bits=8, parity=serial.Parity.NONE)
+            data_bits=8, parity=serial.Parity.NONE,
+            pins=platform.get_uart())
 
         m.submodules.rx_fifo = rx_fifo = SyncFIFOBuffered(width=8, depth=self._rx_fifo_depth)
         m.submodules.tx_fifo = tx_fifo = SyncFIFOBuffered(width=8, depth=self._tx_fifo_depth)
@@ -78,9 +75,6 @@ class UARTPeripheral(wiring.Component):
             rx_fifo.w_data.eq(uart_phy.rx.data),
         ]
         m.d.sync += rx_fifo.w_en.eq(uart_phy.rx.rdy)
-
-        m.submodules += FFSynchronizer(self.rx, uart_phy.rx.i, init=1)
-        m.d.comb += self.tx.eq(uart_phy.tx.o)
 
         m.d.comb += [
             self._status.f.tx_not_full.r_data.eq(tx_fifo.w_rdy),
