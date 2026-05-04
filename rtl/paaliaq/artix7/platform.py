@@ -69,6 +69,7 @@ class PaaliaqPlatform(XilinxPlatform):
         self._soc_clk = soc_clk
         self._sdram_clk = soc_clk
         self._uarts = deque()
+        self._spis = deque()
 
     def toolchain_prepare(self, fragment, name, **kwargs):
         constraints = """
@@ -113,6 +114,9 @@ class PaaliaqPlatform(XilinxPlatform):
         ty = namedtuple("UartPins", "rx, tx")
         self._uarts.append(ty(rx, tx))
 
+    def add_spi(self, spi):
+        self._spis.append(spi)
+
     def get_sdram_ios(self):
         return self._sdram_ios
 
@@ -127,3 +131,6 @@ class PaaliaqPlatform(XilinxPlatform):
 
     def get_uart(self):
         return self._uarts.popleft()
+
+    def get_spi(self):
+        return self._spis.popleft()

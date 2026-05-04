@@ -7,6 +7,7 @@ from paaliaq.artix7.crg import CRG
 
 from paaliaq.cpu import P65C816SoftCore
 from paaliaq.sdram import SDRAMConnector
+from paaliaq.spi import SPIConnector
 
 
 class PaaliaqTop(Elaboratable):
@@ -27,6 +28,7 @@ class PaaliaqTop(Elaboratable):
 
         m.submodules.sdram_conn = sdram_conn = SDRAMConnector()
         m.submodules.w65c816_conn = w65c816_conn = P65C816SoftCore()
+        m.submodules.spi_conn = spi_conn = SPIConnector()
 
         spi_clk_o, spi_clk_oe = Signal(), Signal()
 
@@ -44,6 +46,7 @@ class PaaliaqTop(Elaboratable):
         platform.set_w65c816_ios(w65c816_conn.iface)
         platform.set_boot_spi_clk(spi_clk_o, spi_clk_oe)
         platform.add_uart(uart_rx, uart_tx)
+        platform.add_spi(spi_conn.spi)
 
         m.submodules.soc = soc = SoC(boot_rom_path=self._boot_rom_path)
 
