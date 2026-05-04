@@ -25,10 +25,7 @@
 
   (.asciz test1-str "Test 1 - walking 1s  ... ")
   (.asciz test2-str "Test 2 - walking 0s  ... ")
-  (.asciz test3-str "Test 3 - random fill ... ")
-  (.asciz test4-str "Test 4 - bit fade    ... ")
-
-  (.asciz sleep-str " sleeping for ~2 minutes "))
+  (.asciz test3-str "Test 3 - random fill ... "))
 
  (.text
   (proc memory-test .a-bits 16 .xy-bits 16
@@ -50,11 +47,6 @@
 	ldx (imm test3-str)
 	jsr puts
 	jsr test3
-	jsr log-test-result
-
-	ldx (imm test4-str)
-	jsr puts
-	jsr test4
 	jsr log-test-result
 
 	bra tests)
@@ -351,88 +343,6 @@
 	jsr puts
 
 	lda #x1234
-	sta (dp 16)
-	sta (dp 18)
-
-	#:test-loop
-	jsr rand
-	cmp (ind-far-dp 0)
-	bne fail
-
-	inc (dp 0)
-	inc (dp 0)
-	bne test-loop
-	inc (dp 2)
-	lda (dp 2)
-	cmp ,(bank-nr SDRAM-END)
-	beq test-done
-	jsr show-bank
-	bra test-loop
-
-	#:test-done
-	clc
-	rts
-
-	#:fail
-	sec
-	rts)
-
-
-  (proc wait-1min .a-bits 16 .xy-bits 16
-	lda (far-abs ,(far MMIO-BANK TIMER-TIME))
-	dec (a-reg)
-	pha
-
-	#:loop
-	lda (far-abs ,(far MMIO-BANK TIMER-TIME))
-	cmp (stk 1)
-	bne loop
-
-	pla
-	rts)
-
-
-  (proc test4 .a-bits 16 .xy-bits 16
-	lda ,(bank-nr SDRAM-BASE)
-	sta (dp 2)
-	stz (dp 0)
-
-	lda #x5678
-	sta (dp 16)
-	sta (dp 18)
-
-	ldx (imm write-str)
-	jsr puts
-
-	#:fill-loop
-	jsr rand
-	sta (ind-far-dp 0)
-
-	inc (dp 0)
-	inc (dp 0)
-	bne fill-loop
-	inc (dp 2)
-	lda (dp 2)
-	cmp ,(bank-nr SDRAM-END)
-	beq fill-done
-	jsr show-bank
-	bra fill-loop
-
-	#:fill-done
-	lda ,(bank-nr SDRAM-BASE)
-	sta (dp 2)
-	stz (dp 0)
-
-	ldx (imm sleep-str)
-	jsr puts
-
-	jsr wait-1min
-	jsr wait-1min
-
-	ldx (imm check-str)
-	jsr puts
-
-	lda #x5678
 	sta (dp 16)
 	sta (dp 18)
 
