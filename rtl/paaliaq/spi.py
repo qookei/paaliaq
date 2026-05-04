@@ -147,8 +147,7 @@ class SPIController(wiring.Component):
         m.submodules.bridge = self._bridge
         wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
-        m.submodules.conn = conn = SPIConnector()
-        ios = conn.spi
+        ios = platform.get_spi()
 
         m.submodules.rx_fifo = rx_fifo = SyncFIFOBuffered(width=8, depth=2048)
         m.submodules.tx_fifo = tx_fifo = SyncFIFOBuffered(width=8, depth=2048)
