@@ -1,4 +1,6 @@
 (list
+ (.data
+  (.word video-colors #x000F))
  (.bss
   (.zero video-cursor-x 2)
   (.zero video-cursor-y 2))
@@ -14,16 +16,19 @@
   (proc video-scroll .a-bits 16 .xy-bits 16
 	phb
 
-	lda ,(1- (* 128 47 2))
-	ldx ,(* 128 2)
+	lda ,(1- (* 128 47 4))
+	ldx ,(* 128 4)
 	ldy 0
 	mvn (seg-from-to #x10 #x10)
 
-	lda #x0F20
-	sta (abs ,(* 128 47 2))
-	ldx ,(* 128 47 2)
-	ldy ,(+ 2 (* 128 47 2))
-	lda ,(- (* 128 2) 3)
+	lda #x0020
+	sta (abs ,(* 128 47 4))
+	lda (far-abs video-colors)
+	sta (abs ,(+ (* 128 47 4) 1))
+
+	ldx ,(* 128 47 4)
+	ldy ,(+ 4 (* 128 47 4))
+	lda ,(- (* 128 4) 5)
 	mvn (seg-from-to #x10 #x10)
 
 	lda 47
@@ -33,18 +38,19 @@
 	plb
 	rts)
 
-
   (proc video-clear .a-bits 16 .xy-bits 16
 	phb
 
 	phe #x1010
 	plb plb
 
-	lda #x0F20
+	lda #x0020
 	sta (abs #x0000)
+	lda (far-abs video-colors)
+	sta (abs #x0001)
 	ldx #x0000
-	ldy #x0002
-	lda ,(- (* 128 48 2) 3)
+	ldy #x0004
+	lda ,(- (* 128 48 4) 5)
 	mvn (seg-from-to #x10 #x10)
 
 	lda 0
@@ -95,6 +101,7 @@
 	clc
 	adc (abs video-cursor-x)
 	asl (a-reg)
+	asl (a-reg)
 	tax
 
 	pla
@@ -105,9 +112,9 @@
 
 	sep #b00100000 .a-bits 8
 	sta (x-abs #x0000)
-	lda #x0F
-	sta (x-abs #x0001)
 	rep #b00100000 .a-bits 16
+	lda (far-abs video-colors)
+	sta (x-abs #x0001)
 
 	plb
 
