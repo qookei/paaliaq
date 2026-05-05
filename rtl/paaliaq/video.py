@@ -13,8 +13,48 @@ from paaliaq.pll import S7MMCM
 from paaliaq.font import get_font_data
 
 
+def gen_color_palette():
+    out = [0] * 256
+
+    # Colors [0, 16) are the classical 16 color palette
+    for i in range(0, 16):
+        if i > 8:
+            level = 255
+        elif i == 7:
+            level = 229
+        else:
+            level = 205
+
+        r = 127 if i == 8 else level if (i & 1) != 0 else 92 if i == 12 else 0
+        g = 127 if i == 8 else level if (i & 2) != 0 else 92 if i == 12 else 0
+        b = 127 if i == 8 else 238 if i == 4 else level if (i & 4) != 0 else 0
+
+        out[i] = (r << 16) | (g << 8) | b
+
+    # Colors [16, 232) are a 6x6x6 color cube
+    for i in range(16, 232):
+        xyz = i - 16
+        x, yz = xyz // 36, xyz % 36
+        y, z = yz // 6, yz % 6
+
+        r = x * 40 + 55 if x != 0 else 0
+        g = y * 40 + 55 if y != 0 else 0
+        b = z * 40 + 55 if z != 0 else 0
+
+        out[i] = (r << 16) | (g << 8) | b
+
+    # Colors [232, 256) are grayscale ramp
+    for i in range(232, 256):
+        level = i - 232
+        r = g = b = level * 10 + 8
+
+        out[i] = (r << 16) | (g << 8) | b
+
+    return out
+
+
 class TextFramebuffer(wiring.Component):
-    wb_bus: In(wishbone.Signature(addr_width=14, data_width=8))
+    wb_bus: In(wishbone.Signature(addr_width=15, data_width=8))
     csr_bus: wiring.In(csr.Signature(addr_width=4, data_width=8))
 
     class CursorRegister(csr.Register, access="rw"):
@@ -31,8 +71,8 @@ class TextFramebuffer(wiring.Component):
         self._bridge = csr.Bridge(mmap)
         self.csr_bus.memory_map = mmap
 
-        self.wb_bus.memory_map = MemoryMap(addr_width=14, data_width=8)
-        self.wb_bus.memory_map.add_resource(self, name=("text",), size=128*48*2)
+        self.wb_bus.memory_map = MemoryMap(addr_width=15, data_width=8)
+        self.wb_bus.memory_map.add_resource(self, name=("text",), size=128*48*4)
         self.wb_bus.memory_map.freeze()
 
     def elaborate(self, platform):
@@ -65,7 +105,7 @@ class TextFramebuffer(wiring.Component):
         )
 
         m.submodules.text = text = memory.Memory(
-            shape=unsigned(16),
+            shape=unsigned(32),
             depth=128*48,
             init=[],
         )
@@ -91,29 +131,12 @@ class TextFramebuffer(wiring.Component):
 
         m.d.comb += text_rd.addr.eq((seq.h_pos >> 3) + (seq.v_pos >> 4) * 128)
 
-        char, fg, bg = Signal(8), Signal(4), Signal(4)
+        char, fg, bg = Signal(8), Signal(8), Signal(8)
         m.d.comb += Cat(char, fg, bg).eq(text_rd.data)
 
         m.d.comb += font_rd.addr.eq(char * 16 + (seq.v_pos & 15))
 
-        colors = Array([
-            0x232627,
-            0xed1515,
-            0x11d116,
-            0xf67400,
-            0x1d99f3,
-            0x9b59b6,
-            0x1abc9c,
-            0xfcfcfc,
-            0x7f8c8d,
-            0xc0392b,
-            0x1cdc9a,
-            0xfdbc4b,
-            0x3daee9,
-            0x8e44ad,
-            0x16a085,
-            0xffffff,
-        ])
+        colors = Array(gen_color_palette())
 
         cell_x = delayed(seq.h_pos, 2)
         font_bit = font_rd.data[::-1].bit_select(cell_x & 7, 1)
@@ -131,16 +154,16 @@ class TextFramebuffer(wiring.Component):
         text_bus_rd = text.read_port()
         text_wr = text.write_port(granularity=8)
         m.d.comb += [
-            text_bus_rd.addr.eq(self.wb_bus.adr >> 1),
-            text_wr.addr.eq(self.wb_bus.adr >> 1),
-            text_wr.data.eq(self.wb_bus.dat_w.replicate(2)),
-            self.wb_bus.dat_r.eq(text_bus_rd.data.word_select(self.wb_bus.adr & 1, 8)),
+            text_bus_rd.addr.eq(self.wb_bus.adr >> 2),
+            text_wr.addr.eq(self.wb_bus.adr >> 2),
+            text_wr.data.eq(self.wb_bus.dat_w.replicate(4)),
+            self.wb_bus.dat_r.eq(text_bus_rd.data.word_select(self.wb_bus.adr & 3, 8)),
         ]
 
         with m.If(self.wb_bus.ack):
             m.d.sync += self.wb_bus.ack.eq(0)
         with m.Elif(self.wb_bus.cyc & self.wb_bus.stb):
-            m.d.comb += text_wr.en.eq(Mux(self.wb_bus.we, 1 << (self.wb_bus.adr & 1), 0))
+            m.d.comb += text_wr.en.eq(Mux(self.wb_bus.we, 1 << (self.wb_bus.adr & 3), 0))
             m.d.comb += text_bus_rd.en.eq(~self.wb_bus.we)
             m.d.sync += self.wb_bus.ack.eq(1)
 
