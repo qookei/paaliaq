@@ -133,6 +133,52 @@
 	#:done
 	jsr video-update-cursor
 	plp
-	rts
+	rts)
 
-  )))
+  (proc video-show-colors .a-bits 16 .xy-bits 16
+	ldx (imm 0)
+
+	#:loop
+	phx
+	txa
+	xba
+	sta (abs video-colors)
+	lda ,(char->integer #\space)
+	jsr video-putc
+	lda ,(char->integer #\space)
+	jsr video-putc
+	plx
+
+	inc (x-reg)
+	cpx (imm 256)
+	beq done
+	txa
+	and (imm #x000F)
+	bne loop
+	phx
+	lda ,(char->integer #\cr)
+	jsr video-putc
+	lda ,(char->integer #\lf)
+	jsr video-putc
+	plx
+	bra loop
+
+	#:done
+	lda #x000F
+	sta (abs video-colors)
+
+	lda ,(char->integer #\cr)
+	jsr video-putc
+	lda ,(char->integer #\lf)
+	jsr video-putc
+
+	lda #x000F
+	sta (abs video-colors)
+
+	lda ,(char->integer #\cr)
+	jsr video-putc
+	lda ,(char->integer #\lf)
+	jsr video-putc
+
+	rts)
+  ))
