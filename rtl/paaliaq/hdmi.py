@@ -31,25 +31,27 @@ class TMDSEncoder(wiring.Component):
             for i in range(1, 8):
                 m.d.comb += data_min[i].eq(self.data_in[i] ^ data_min[i - 1])
 
-        in_balance = in_1_cnt - 4
+        min_1_cnt = sum(data_min[0:8])
+        min_0_cnt = 8 - min_1_cnt
+        min_balance = min_1_cnt - min_0_cnt
         total_balance = Signal(signed(4))
 
         out = Signal(10)
 
-        with m.If((in_balance == 0) | (total_balance == 0)):
+        with m.If((min_balance == 0) | (total_balance == 0)):
             with m.If(data_min[8]):
                 m.d.comb += out.eq(Cat(data_min, 0))
-                m.d.sync += total_balance.eq(total_balance + in_balance)
+                m.d.sync += total_balance.eq(total_balance + min_balance)
             with m.Else():
                 m.d.comb += out.eq(Cat(~data_min[0:8], 0, 1))
-                m.d.sync += total_balance.eq(total_balance - in_balance)
+                m.d.sync += total_balance.eq(total_balance - min_balance)
         with m.Else():
-            with m.If(in_balance[3] == total_balance[3]):
+            with m.If((min_balance > 0) == (total_balance > 0)):
                 m.d.comb += out.eq(Cat(~data_min[0:8], data_min[8], 1))
-                m.d.sync += total_balance.eq(total_balance + data_min[8] - in_balance)
+                m.d.sync += total_balance.eq(total_balance + 2 * data_min[8] - min_balance)
             with m.Else():
                 m.d.comb += out.eq(Cat(data_min, 0))
-                m.d.sync += total_balance.eq(total_balance - (~data_min[8]) + in_balance)
+                m.d.sync += total_balance.eq(total_balance - 2 * (~data_min[8]) + min_balance)
 
         with m.If(self.active):
             m.d.sync += self.data_out.eq(out)
