@@ -48,6 +48,8 @@
 	ldx (imm sdram-init-done-str)
 	jsr puts
 
+	jsr video-show-colors
+
 	jsr pmc-measure
 
 	#:prompt
