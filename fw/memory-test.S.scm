@@ -59,18 +59,19 @@
 	stz (dp 0)
 
 	txy
+	phy
 
 	#:heading
 	lda (dp 2)
 	jsr puthex-byte
-	phy
-	tya
+	pla
+	pha
 	jsr puthex-word
 	lda #x20
 	jsr putc
-	ply
 
 	#:loop
+	ply
 	sep #b00100000 .a-bits 8
 	lda (y-ind-far-dp 0)
 	rep #b00100000 .a-bits 16
@@ -80,6 +81,7 @@
 	jsr putc
 	ply
 	inc (y-reg)
+	phy
 	tya
 	and (imm #xFF)
 	beq done
@@ -90,6 +92,7 @@
 
 	#:done
 	jsr nl
+	ply
 	plp
 	rts)
 
