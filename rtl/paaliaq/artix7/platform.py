@@ -47,18 +47,15 @@ class PaaliaqPlatform(XilinxPlatform):
             attrs=Attrs(IOSTANDARD="LVCMOS33"),
         ),
 
-        # XXX(qookie): This is not the final pin assignment. I haven't
-        # designed the PCB with the CPU yet, I just want to see the
-        # fMAX when using an external CPU.
-        #W65C816Resource(
-        #    0,
-        #    clk="C4", rst="D4",
-        #    addr="E4 D3 F5 E3 F1 F2 G2 G1 H2 H3 B1 C2 C1 D1 E2 E1",
-        #    data="P5 R3 P2 R2 T2 N6 N14 R12",
-        #    rwb="R14", vda="T14", vpa="P12", vpb="P14",
-        #    irq="R15", nmi="T15", abort="P13",
-        #    attrs=Attrs(PULLMODE="NONE", DRIVE="4", SLEWRATE="FAST", IOSTANDARD="LVCMOS33")
-        #)
+        W65C816Resource(
+            0,
+            clk="W18", rst="V14",
+            addr="T20 W21 U22 V23 AB24 AA24 V24 AB26 Y25 W25 V26 U25 U26 W26 Y26 AA25",
+            data="U20 Y21 V22 W23 AC24 AB25 W24 AC26",
+            rwb="W19", vda="V17", vpa="V19", vpb="U14",
+            irq="V16", nmi="V18", abort="U15",
+            attrs=Attrs(DRIVE="4", IOSTANDARD="LVCMOS33")
+        )
     ]
 
     connectors = []
