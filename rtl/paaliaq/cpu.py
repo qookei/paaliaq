@@ -39,6 +39,9 @@ class W65C816Connector(wiring.Component):
 
         cpu = platform.request("w65c816", dir="-")
 
+
+        m.submodules.clk = clk = io.Buffer("o", cpu.clk)
+        m.submodules.rst = rst = io.Buffer("o", cpu.rst)
         m.submodules.addr = addr = io.Buffer("i", cpu.addr)
         m.submodules.data = data = io.Buffer("io", cpu.data)
         m.submodules.rwb = rwb = io.Buffer("i", cpu.rwb)
@@ -50,6 +53,8 @@ class W65C816Connector(wiring.Component):
         m.submodules.abort = abort = io.Buffer("o", cpu.abort)
 
         m.d.comb += [
+            clk.o.eq(self.iface.clk),
+            rst.o.eq(self.iface.rst),
             self.iface.addr_lo.eq(addr.i),
             self.iface.addr_hi.eq(data.i),
             data.o.eq(self.iface.r_data),
