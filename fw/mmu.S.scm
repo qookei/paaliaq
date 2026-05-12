@@ -75,8 +75,8 @@
 	sta (far-abs ,MMU-TLB-FLUSH)
 
 	;; Install NMI handler
-	lda (imm nmi-handler)
-	sta (far-abs #x00FFEA)
+	lda (imm abort-handler)
+	sta (far-abs #x00FFE8)
 
 	;; Test aborts
 	lda (far-abs #x200ABC)
@@ -85,7 +85,7 @@
 
 	rts)
 
-  (proc nmi-handler
+  (proc abort-handler
 	rep #b00110000 .a-bits 16 .xy-bits 16
 	pha
 	phx
@@ -99,6 +99,12 @@
 	lda (far-abs ,(+ MMU-FAULT-REASON 2))
 	jsr puthex-dword
 	jsr nl
+
+	;; Skip the faulting insns (sta far-abs).
+	lda (stk 8)
+	clc
+	adc (imm 4)
+	sta (stk 8)
 
 	ply
 	plx
