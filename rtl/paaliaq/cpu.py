@@ -371,7 +371,7 @@ class W65C816WishboneBridge(wiring.Component):
                 with m.If(~self.mmu.stb | self.mmu.valid):
                     m.d.sync += self.mmu.stb.eq(0)
 
-                    with m.If(self.mmu.abort):
+                    with m.If(self.mmu.abort & ~aborted):
                         m.d.sync += abort_q.eq(1)
                         m.d.sync += aborted.eq(1)
 
