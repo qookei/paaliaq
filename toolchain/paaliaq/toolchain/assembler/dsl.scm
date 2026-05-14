@@ -36,7 +36,14 @@
 	    local
 	    param
 	    y-ind-param
-	    y-ind-far-param))
+	    y-ind-far-param
+
+	    .a8xy8
+	    .a8
+	    .xy8
+	    .a16xy16
+	    .a16
+	    .xy16))
 
 
 (define (%data-size body)
@@ -218,3 +225,25 @@
 (define (y-ind-far-param locals n)
   ;; n bytes into params, skip locals, skip saved DP, skip return address
   `(y-ind-far-dp ,(+ n locals 2 2)))
+
+
+;; These helpers include NOPs to deal with CPUs made prior to a mask
+;; redesign by Sanyo.
+
+(define .a8xy8
+  '(sep #b00110000 nop .a-bits 8 .xy-bits 8))
+
+(define .a8
+  '(sep #b00100000 nop .a-bits 8))
+
+(define .xy8
+  '(sep #b00010000 nop .xy-bits 8))
+
+(define .a16xy16
+  '(rep #b00110000 nop .a-bits 16 .xy-bits 16))
+
+(define .a16
+  '(rep #b00100000 nop .a-bits 16))
+
+(define .xy16
+  '(rep #b00010000 nop .xy-bits 16))
