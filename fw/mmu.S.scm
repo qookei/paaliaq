@@ -51,8 +51,8 @@
 	lda (imm #x1234)
 	sta (far-abs #x200000)
 
-	;; Write page table entry for #x200000, map to #x801000 as RW
-	lda (imm #x8013)
+	;; Write page table entry for #x200000, map to #x801000 as RWX
+	lda (imm #x8017)
 	sta (far-abs page-table ,(ash #x200000 -11))
 
 	;; Flush TLB entry for #x200000
@@ -81,10 +81,16 @@
 	lda (imm #x0000)
 	sta (far-abs page-table ,(ash #x201000 -11))
 
-	;; Flush TLB entry for #x1FF000
+	;; Write page table entry for #x004000, unmap
+	lda (imm #x0000)
+	sta (far-abs page-table ,(ash #x004000 -11))
+
+	;; Flush TLB entries for #x1FF000, #x201000, #x004000
 	lda (imm #x1FF0)
 	sta (far-abs ,MMU-TLB-FLUSH)
 	lda (imm #x2010)
+	sta (far-abs ,MMU-TLB-FLUSH)
+	lda (imm #x0040)
 	sta (far-abs ,MMU-TLB-FLUSH)
 
 	;; Prepare data on edges
@@ -112,12 +118,29 @@
 	lda (far-abs #x200FFF)
 	nop
 
-	;; TODO: Test instruction fetch faults
-	;; To test: opcode, operand bytes
+	;; Try aborting indirect read
+	phd
+	phe (imm #x4000)
+	pld
 
-	;; TODO: Test faults in doubly indirect loads/stores
-	;; The logic should cause the remainder of the instruction to
-	;; be a no-op. (Assuming the CPU doesn't deal with it in it's own way)
+	lda (ind-far-dp #x00)
+	nop nop nop
+
+	pld
+
+	;; Try aborting instruction fetches
+	;; First, try aborting on the opcode fetch
+
+	;; Far call #x1FFFFF, then abort handler adds 4 => next insn executed is at #x200003
+
+	;; Place RTL at the new address
+	lda (imm #x6B6B)
+	sta (far-abs #x200002)
+	;; Jump to unmapped page
+	jsl (far-abs #x1FFFFF)
+
+	;; TODO: Test instruction fetch faults
+	;; To test: operand bytes
 
 	;; Write page table entry for #x200000, unmap
 	lda (imm #x0000)
@@ -152,10 +175,15 @@
 	jsr nl
 
 	;; Skip the faulting insns (sta far-abs).
+	;; Lo word
 	lda (stk 8)
 	clc
 	adc (imm 4)
 	sta (stk 8)
+	;; Hi word
+	lda (stk 10)
+	adc (imm 0)
+	sta (stk 10)
 
 	ply
 	plx
