@@ -236,11 +236,17 @@ class W65C816WishboneBridge(wiring.Component):
         rst_high_ctr = Signal(range(clks_rst_high + 1))
         print(f'Will hold clock during reset high for {clks_rst_high} clocks')
 
-        rst_before_vp = Signal()
+        clks_abort_setup = ns_to_cycles(25) # TODO
+        abort_setup_ctr = Signal(range(clks_abort_setup + 1))
+        print(f'Will hold ABORT before rising clock edge for {clks_abort_setup} clocks')
 
-        m.d.comb += cpu_io.nmi.eq(~self.mmu.abort)
+        rst_before_vp = Signal()
+        abort_q = Signal()
+        aborted = Signal()
+
+        m.d.comb += cpu_io.nmi.eq(1)
         m.d.comb += cpu_io.irq.eq(~self.irq.i)
-        m.d.comb += cpu_io.abort.eq(~self.mmu.abort)
+        m.d.comb += cpu_io.abort.eq(~abort_q)
 
         # TODO(qookie):
         m.d.comb += self.mmu.user.eq(0)
@@ -331,7 +337,8 @@ class W65C816WishboneBridge(wiring.Component):
             with m.State('clear-r_data_en'):
                 m.d.sync += [
                     cpu_io.r_data_en.eq(0),
-                    latch_addr_ctr.eq(0)
+                    latch_addr_ctr.eq(0),
+                    abort_q.eq(0),
                 ]
                 m.next = 'latch-address'
             with m.State('latch-address'):
@@ -347,11 +354,12 @@ class W65C816WishboneBridge(wiring.Component):
                         self.mmu.vaddr.eq(Cat(cpu_io.addr_lo, cpu_io.addr_hi)),
                         self.mmu.write.eq(~cpu_io.rw),
                         self.mmu.ifetch.eq(cpu_io.vpa),
-                        self.mmu.stb.eq(cpu_io.vda | cpu_io.vpa),
+                        self.mmu.stb.eq((cpu_io.vda | cpu_io.vpa) & (~aborted | (cpu_io.vda & cpu_io.vpa))),
                     ]
                     with m.If(~cpu_io.vpb):
                         m.d.sync += rst_before_vp.eq(0)
                     with m.If(cpu_io.vpa & cpu_io.vda):
+                        m.d.sync += aborted.eq(0)
                         m.d.sync += insn_ctr.eq(insn_ctr + 1)
                         with m.If(self._dbg_config.f.dbg_en_next_insn.data):
                             m.d.comb += [
@@ -363,14 +371,25 @@ class W65C816WishboneBridge(wiring.Component):
                 with m.If(~self.mmu.stb | self.mmu.valid):
                     m.d.sync += self.mmu.stb.eq(0)
 
+                    with m.If(self.mmu.abort):
+                        m.d.sync += abort_q.eq(1)
+                        m.d.sync += aborted.eq(1)
+
                     with m.If(write_in_progress):
                         m.next = 'wait-write-completion'
+                    with m.Elif(self.mmu.abort):
+                        m.next = 'abort-setup-wait'
                     with m.Else():
                         m.d.comb += self._dbg_config.f.trace_halted.set.eq(1)
                         m.next = 'clk-rising-edge'
             with m.State('wait-write-completion'):
                 with m.If(~write_in_progress):
                     m.d.comb += self._dbg_config.f.trace_halted.set.eq(1)
+                    m.next = 'clk-rising-edge'
+            with m.State('abort-setup-wait'):
+                m.d.sync += abort_setup_ctr.eq(abort_setup_ctr + 1)
+                with m.If(abort_setup_ctr == clks_abort_setup):
+                    m.d.sync += abort_setup_ctr.eq(0)
                     m.next = 'clk-rising-edge'
             with m.State('clk-rising-edge'):
                 m.d.sync += [
@@ -381,7 +400,7 @@ class W65C816WishboneBridge(wiring.Component):
                 ]
                 with m.If(trace_en & trace_halted):
                     pass
-                with m.Elif(~((cpu_io.vda | cpu_io.vpa) & cpu_io.abort & ~rst_before_vp)):
+                with m.Elif(~((cpu_io.vda | cpu_io.vpa) & ~aborted & ~rst_before_vp)):
                     m.d.sync += wait_noop_ctr.eq(0)
                     m.next = 'noop-cycle'
                 with m.Elif(cpu_io.rw):
