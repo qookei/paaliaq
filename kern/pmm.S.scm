@@ -83,9 +83,9 @@
 
 	;; Mark as taken
 	lda 2
-	sep #b00100000 .a-bits 8
+	,.a8
 	sta (x-far-abs ,(+ +page-entry-array-base+ +page-entry-state+))
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	txa
 	;; Turn into PFN
@@ -137,9 +137,9 @@
 
 	;; Mark as free
 	lda 1
-	sep #b00100000 .a-bits 8
+	,.a8
 	sta (x-far-abs ,(+ +page-entry-array-base+ +page-entry-state+))
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	plp rts)
   )
