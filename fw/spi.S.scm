@@ -19,10 +19,10 @@
 	lda (imm #x0000)
 	sta (abs ,SPI0-SEGMENT)
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	lda #x66
 	sta (abs ,SPI0-TX-DATA)
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	;; Kick with divisor=1
 	lda (imm #x0101)
@@ -39,10 +39,10 @@
 	lda (imm #x0000)
 	sta (abs ,SPI0-SEGMENT)
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	lda #x99
 	sta (abs ,SPI0-TX-DATA)
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	;; Kick with divisor=1
 	lda (imm #x0101)
@@ -69,13 +69,13 @@
 	lda (imm #x40FF)
 	sta (abs ,SPI0-SEGMENT)
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	lda #x0b
 	sta (abs ,SPI0-TX-DATA)
 	stz (abs ,SPI0-TX-DATA)
 	stz (abs ,SPI0-TX-DATA)
 	stz (abs ,SPI0-TX-DATA)
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	;; Kick with divisor=1
 	lda (imm #x0101)
@@ -86,7 +86,7 @@
 	bit (imm 1)
 	bne wait
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	ldx (imm 0)
 	#:read
 	lda (abs ,SPI0-RX-DATA)
@@ -95,7 +95,7 @@
 	inc (x-reg)
 	cpx (imm #x100)
 	bne read
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	plb
 

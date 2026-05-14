@@ -63,7 +63,7 @@
 
   (proc video-putc
 	php
-	rep #b00100000 .a-bits 16 .xy-bits 16
+	,.a16 .xy-bits 16
 
 	cmp ,(char->integer #\backspace)
 	beq backspace
@@ -110,9 +110,9 @@
 	phe #x1010
 	plb plb
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	sta (x-abs #x0000)
-	rep #b00100000 .a-bits 16
+	,.a16
 	lda (far-abs video-colors)
 	sta (x-abs #x0001)
 
