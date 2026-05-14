@@ -191,11 +191,11 @@ class W65C816WishboneBridge(wiring.Component):
 
         # Times in nanoseconds
         tDHR = 10 # From falling edge, read hold time
-        tADS = 450 # From falling edge to when full address is available
+        tADS = 115 # From falling edge to when full address is available
         tMDS = 60 # From rising edge to when data bus has write data
 
-        tPWL = 500 # Min time for clock to be low
-        tPWH = 500 # Min time for clock to be high
+        tPWL = 125 # Min time for clock to be low
+        tPWH = 125 # Min time for clock to be high
 
         assert tDHR + tADS <= tPWL, "Min clock low time too short"
 
