@@ -6,7 +6,8 @@
 (list
  (.rodata
   (.asciz mmu-test-str "MMU test\r\n")
-  (.asciz page-fault-str "Page fault! reason="))
+  (.asciz page-fault-str "Page fault! reason=")
+  (.asciz a=-str ", A="))
 
  (.data
   (.word page-table
@@ -23,6 +24,10 @@
   (proc mmu-test .a-bits 16 .xy-bits 16
 	ldx (imm mmu-test-str)
 	jsr puts
+
+	;; Install abort handler
+	lda (imm abort-handler)
+	sta (far-abs #x00FFE8)
 
 	;; Load new page table
 	lda (imm page-table)
@@ -66,6 +71,54 @@
 	ldx (imm #x1000)
 	jsr dump-16-bytes
 
+	;; Test abort behavior for edge cases
+
+	;; Write page table entry for #x1FF000, unmap
+	lda (imm #x0000)
+	sta (far-abs page-table ,(ash #x1FF000 -11))
+
+	;; Write page table entry for #x201000, unmap
+	lda (imm #x0000)
+	sta (far-abs page-table ,(ash #x201000 -11))
+
+	;; Flush TLB entry for #x1FF000
+	lda (imm #x1FF0)
+	sta (far-abs ,MMU-TLB-FLUSH)
+	lda (imm #x2010)
+	sta (far-abs ,MMU-TLB-FLUSH)
+
+	;; Prepare data on edges
+	lda (imm #xAABB)
+	sta (far-abs #x200000)
+	lda (imm #xCCDD)
+	sta (far-abs #x200FFE)
+	lda (imm #xEEFF)
+
+	;; Try fully unmapped write
+	sta (far-abs #x201000)
+	nop
+	;; Try torn write
+	sta (far-abs #x1FFFFF)
+	nop
+	;; Torn write to #x200FFF not tested -- the low byte would
+	;; actually get written successfully...
+
+	;; Try fully unmapped read
+	lda (far-abs #x201000)
+	nop
+	;; Try torn reads
+	lda (far-abs #x1FFFFF)
+	nop
+	lda (far-abs #x200FFF)
+	nop
+
+	;; TODO: Test instruction fetch faults
+	;; To test: opcode, operand bytes
+
+	;; TODO: Test faults in doubly indirect loads/stores
+	;; The logic should cause the remainder of the instruction to
+	;; be a no-op. (Assuming the CPU doesn't deal with it in it's own way)
+
 	;; Write page table entry for #x200000, unmap
 	lda (imm #x0000)
 	sta (far-abs page-table ,(ash #x200000 -11))
@@ -73,15 +126,6 @@
 	;; Flush TLB entry for #x200000
 	lda (imm #x2000)
 	sta (far-abs ,MMU-TLB-FLUSH)
-
-	;; Install NMI handler
-	lda (imm abort-handler)
-	sta (far-abs #x00FFE8)
-
-	;; Test aborts
-	lda (far-abs #x200ABC)
-	nop
-	sta (far-abs #x200ABC)
 
 	rts)
 
@@ -98,6 +142,13 @@
 	tax
 	lda (far-abs ,(+ MMU-FAULT-REASON 2))
 	jsr puthex-dword
+
+	ldx (imm a=-str)
+	jsr puts
+
+	lda (stk 5)
+	jsr puthex-word
+
 	jsr nl
 
 	;; Skip the faulting insns (sta far-abs).
