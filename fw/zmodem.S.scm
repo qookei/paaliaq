@@ -255,9 +255,9 @@
 	cmp #x100
 	bcs special
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	sta (ind-far-dp 0)
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	inc (dp 0)
 	bne no-carry
@@ -360,9 +360,9 @@
 	jsr getc
 
 	;; Check if we overflowed the UART buffer at some point
-	sep #b00100000 .a-bits 8
+	,.a8
 	lda (far-abs #x010001)
-	rep #b00100000 .a-bits 16
+	,.a16
 	bit #x10
 	bne overflow
 

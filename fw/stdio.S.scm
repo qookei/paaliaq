@@ -16,7 +16,7 @@
 
 
   (proc puts .a-bits 16 .xy-bits 16
-	sep #b00100000 .a-bits 8
+	,.a8
 
 	#:more
 	lda (x-abs 0)
@@ -28,7 +28,7 @@
 	bra more
 
 	#:done
-	rep #b00100000 .a-bits 16
+	,.a16
 	rts)
 
 

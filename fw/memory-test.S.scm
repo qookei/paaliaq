@@ -72,9 +72,9 @@
 
 	#:loop
 	ply
-	sep #b00100000 .a-bits 8
+	,.a8
 	lda (y-ind-far-dp 0)
-	rep #b00100000 .a-bits 16
+	,.a16
 	phy
 	jsr puthex-byte
 	lda #x20
@@ -135,7 +135,7 @@
 	ldy #x0001
 
 	#:fill-loop
-	sep #b00100000 .a-bits 8
+	,.a8
 	tya
 	sta (ind-far-dp 0)
 	asl (a-reg)
@@ -143,7 +143,7 @@
 	lda #x01
 	#:fill-continue
 	tay
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	inc (dp 0)
 	bne fill-loop
@@ -165,7 +165,7 @@
 	ldy #x0001
 
 	#:test-loop
-	sep #b00100000 .a-bits 8
+	,.a8
 	tya
 	cmp (ind-far-dp 0)
 	bne fail
@@ -174,7 +174,7 @@
 	lda #x01
 	#:test-continue
 	tay
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	inc (dp 0)
 	bne test-loop
@@ -190,7 +190,7 @@
 	rts
 
 	#:fail
-	rep #b00100000 .a-bits 16
+	,.a16
 	sec
 	rts)
 
@@ -206,7 +206,7 @@
 	ldy #x0001
 
 	#:fill-loop
-	sep #b00100000 .a-bits 8
+	,.a8
 	tya
 	eor #xFF
 	sta (ind-far-dp 0)
@@ -216,7 +216,7 @@
 	lda #x01
 	#:fill-continue
 	tay
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	inc (dp 0)
 	bne fill-loop
@@ -238,7 +238,7 @@
 	ldy #x0001
 
 	#:test-loop
-	sep #b00100000 .a-bits 8
+	,.a8
 	tya
 	eor #xFF
 	cmp (ind-far-dp 0)
@@ -249,7 +249,7 @@
 	lda #x01
 	#:test-continue
 	tay
-	rep #b00100000 .a-bits 16
+	,.a16
 
 	inc (dp 0)
 	bne test-loop
@@ -265,15 +265,12 @@
 	rts
 
 	#:fail
-	rep #b00100000 .a-bits 16
+	,.a16
 	sec
 	rts)
 
 
-  (proc rand
-	php .a-bits 8 .xy-bits 16
-	rep #b00100000 .a-bits 16
-
+  (proc rand .a-bits 16 .xy-bits 16
 	;; x ^= x << 5
 	lda (dp 16)
 	asl (a-reg)
@@ -308,7 +305,7 @@
 	;; return y
 	lda (dp 18)
 
-	plp rts)
+	rts)
 
 
   (proc test3 .a-bits 16 .xy-bits 16

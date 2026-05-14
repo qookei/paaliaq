@@ -86,7 +86,7 @@
 	rts)
 
   (proc abort-handler
-	rep #b00110000 .a-bits 16 .xy-bits 16
+	,.a16xy16
 	pha
 	phx
 	phy
@@ -130,9 +130,9 @@
 	ply
 
 	#:loop
-	sep #b00100000 .a-bits 8
+	,.a8
 	lda (y-ind-far-dp 0)
-	rep #b00100000 .a-bits 16
+	,.a16
 	phy
 	jsr puthex-byte
 	lda #x20

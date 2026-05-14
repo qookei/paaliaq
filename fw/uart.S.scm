@@ -16,7 +16,7 @@
 	phe ,(bank-plb MMIO-BANK)
 	plb plb
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	#:tx-full
 	bit (abs ,UART0-STATUS)
 	bpl tx-full
@@ -27,7 +27,7 @@
 	rts)
 
   (proc uart-puts .a-bits 16 .xy-bits 16
-	sep #b00100000 .a-bits 8
+	,.a8
 
 	#:more
 	lda (x-abs 0)
@@ -39,7 +39,7 @@
 	bra more
 
 	#:done
-	rep #b00100000 .a-bits 16
+	,.a16
 	rts)
 
   (proc uart-getc
@@ -47,7 +47,7 @@
 	phe ,(bank-plb MMIO-BANK)
 	plb plb
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	#:rx-empty
 	bit (abs ,UART0-STATUS)
 	bvc rx-empty
