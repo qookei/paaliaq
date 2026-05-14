@@ -5,7 +5,7 @@
  (.head.text
   (proc _start
 	;; We know we are in native mode
-	rep #b00110000 .a-bits 16 .xy-bits 16
+	,.a16xy16
 
 	;; Set data bank
 	phe #x8080
@@ -64,9 +64,9 @@
 	lda (far-abs #x010702)
 	sta (dp 2)
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	lda (dp 3)
-	rep #b00100000 .a-bits 16
+	,.a16
 	bpl unknown
 	jsr puthex-nibble
 	lda (dp 1)
@@ -74,9 +74,9 @@
 	lda (dp 0)
 	jsr puthex-byte
 
-	sep #b00100000 .a-bits 8
+	,.a8
 	bit (dp 3)
-	rep #b00100000 .a-bits 16
+	,.a16
 	bvc done
 
 	ldx rev-dirty-str

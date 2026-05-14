@@ -2,7 +2,7 @@
   `(()
     phb
     phd
-    rep #b00110000 .a-bits 16 .xy-bits 16
+    ,.a16
     pha
     phx
     phy
