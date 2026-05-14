@@ -243,6 +243,7 @@ class W65C816WishboneBridge(wiring.Component):
         rst_before_vp = Signal()
         abort_q = Signal()
         aborted = Signal()
+        aborted_q = Signal()
 
         m.d.comb += cpu_io.nmi.eq(1)
         m.d.comb += cpu_io.irq.eq(~self.irq.i)
@@ -354,12 +355,11 @@ class W65C816WishboneBridge(wiring.Component):
                         self.mmu.vaddr.eq(Cat(cpu_io.addr_lo, cpu_io.addr_hi)),
                         self.mmu.write.eq(~cpu_io.rw),
                         self.mmu.ifetch.eq(cpu_io.vpa),
-                        self.mmu.stb.eq((cpu_io.vda | cpu_io.vpa) & (~aborted | (cpu_io.vda & cpu_io.vpa))),
+                        self.mmu.stb.eq((cpu_io.vda | cpu_io.vpa) & ~aborted),
                     ]
                     with m.If(~cpu_io.vpb):
                         m.d.sync += rst_before_vp.eq(0)
                     with m.If(cpu_io.vpa & cpu_io.vda):
-                        m.d.sync += aborted.eq(0)
                         m.d.sync += insn_ctr.eq(insn_ctr + 1)
                         with m.If(self._dbg_config.f.dbg_en_next_insn.data):
                             m.d.comb += [
@@ -371,9 +371,14 @@ class W65C816WishboneBridge(wiring.Component):
                 with m.If(~self.mmu.stb | self.mmu.valid):
                     m.d.sync += self.mmu.stb.eq(0)
 
-                    with m.If(self.mmu.abort & ~aborted):
+                    with m.If(self.mmu.abort & self.mmu.stb):
                         m.d.sync += abort_q.eq(1)
                         m.d.sync += aborted.eq(1)
+
+                    m.d.sync += aborted_q.eq(0)
+                    with m.If(cpu_io.vpa & cpu_io.vda & aborted):
+                        m.d.sync += aborted.eq(0)
+                        m.d.sync += aborted_q.eq(1)
 
                     with m.If(write_in_progress):
                         m.next = 'wait-write-completion'
@@ -400,7 +405,7 @@ class W65C816WishboneBridge(wiring.Component):
                 ]
                 with m.If(trace_en & trace_halted):
                     pass
-                with m.Elif(~((cpu_io.vda | cpu_io.vpa) & ~aborted & ~rst_before_vp)):
+                with m.Elif(~((cpu_io.vda | cpu_io.vpa) & ~aborted & ~aborted_q & ~rst_before_vp)):
                     m.d.sync += wait_noop_ctr.eq(0)
                     m.next = 'noop-cycle'
                 with m.Elif(cpu_io.rw):
