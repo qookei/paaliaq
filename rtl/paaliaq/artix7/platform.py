@@ -31,6 +31,12 @@ class PaaliaqPlatform(XilinxPlatform):
             attrs=Attrs(IOSTANDARD="LVCMOS33"),
         ),
 
+        UARTResource(
+            1,
+            rx="H4", tx="F4",
+            attrs=Attrs(IOSTANDARD="LVCMOS33"),
+        ),
+
         HDMIResource(
             0,
             clk_p="D4", clk_n="C4",
@@ -114,6 +120,13 @@ class PaaliaqPlatform(XilinxPlatform):
     def add_spi(self, spi):
         self._spis.append(spi)
 
+    def set_debug_uart(self, rx, tx):
+        if hasattr(self, "_debug_uart"):
+            raise RuntimeError("Debug UART IOs already set")
+
+        ty = namedtuple("DebugUartPins", "rx, tx")
+        self._debug_uart = ty(rx, tx)
+
     def get_sdram_ios(self):
         return self._sdram_ios
 
@@ -131,3 +144,6 @@ class PaaliaqPlatform(XilinxPlatform):
 
     def get_spi(self):
         return self._spis.popleft()
+
+    def get_debug_uart(self):
+        return self._debug_uart
