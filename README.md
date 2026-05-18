@@ -10,19 +10,20 @@ documentation TBD.
 
 ## Specifications
 
-Using the iCESugar-pro SoM with the following specifications as the
-base FPGA board:
+Using the QMTECH XC7A100T Wukong board with the following
+specifications as the base FPGA board:
 
- - Lattice ECP5 LFE5U-25F FPGA
+ - Xilinx Artix-7 100T FPGA
  - 32MiB of SDR SDRAM
- - 32MiB SPI flash (holding the bitstream, with free space after it)
+ - 8MiB SPI flash (holding the bitstream, with free space after it)
  - SD card slot
- - RGB led
+ - Ethernet port with GMII PHY
+ - Some LEDs and buttons
+ - 4 PMODs, 40 pin header exposing 34 FPGA I/Os (see below for usage).
 
-The project is currently using a soft-core 65C816 implementation, with
-future plans for a custom PCB holding an actual 65C816 chip, a SODIMM
-slot for the FPGA SoM and breaking out various IO interfaces (HDMI,
-UARTs, GPIO, etc).
+Attached to the FPGA board's 40 pin header is an adapter board holding
+a DIP40 variant of the 65C816 CPU, currently running at approximately
+4 MHz.
 
 ## How?
 
@@ -44,6 +45,8 @@ it's contents:
 
  - `rtl` - The source code for the FPGA implementation of the chipset.
  - `toolchain` - The source code for the toolchain (assembler, etc).
+ - `fw` - The source code for the firmware (embedded in BRAM).
+ - `kern` - The source code for the kernel (loaded over serial).
 
 ## License
 
