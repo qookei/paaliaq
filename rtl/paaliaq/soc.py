@@ -8,7 +8,7 @@ from amaranth.lib.wiring import In, Out
 
 from paaliaq.cpu import W65C816WishboneBridge
 
-#from paaliaq.jtag import JTAGDebugProbe
+from paaliaq.debug import UARTDebugBridge
 
 from paaliaq.uart import UARTPeripheral
 
@@ -117,8 +117,8 @@ class SoC(Elaboratable):
         m.submodules.cpu_bridge = cpu_bridge = W65C816WishboneBridge()
         wb_arb.add(cpu_bridge.wb_bus)
 
-        #m.submodules.jtag_debug = jtag_debug = JTAGDebugProbe()
-        #wb_arb.add(jtag_debug.wb_bus)
+        m.submodules.uart_debug = uart_debug = UARTDebugBridge()
+        wb_arb.add(uart_debug.wb_bus)
 
         m.submodules.wb_dec = wb_dec = wishbone.Decoder(addr_width=24, data_width=8)
 
