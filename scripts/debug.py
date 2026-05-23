@@ -3,6 +3,7 @@
 import serial
 from contextlib import contextmanager
 
+
 class UARTDebugHost:
     def __init__(self, port, baud=115200):
         self._ser = serial.Serial(port, baud)
@@ -114,8 +115,8 @@ class UARTDebugHost:
 
         self.poke8(0x10408, 0x0c)
 
-        done = ctrl.should_resume_after(va, vpa, vda, vpb, rwb)
-        if done:
+        done, resume = ctrl.should_resume_after(va, vpa, vda, vpb, rwb)
+        if done and resume:
             # Clear dbg_enable (RW1C)
             self.poke8(0x10408, 0x0d)
 
@@ -132,39 +133,3 @@ class UARTDebugHost:
         self.debug_enable()
         while not self.debug_step(ctrl):
             pass
-
-
-class SampleCtrl:
-    def __init__(self):
-        self.pos = 0
-        self.code = [0xAB, 0x00, 0x4C, 0x00, 0x90]
-
-    def should_resume_after(self, addr, vpa, vda, vpb, rwb):
-        return self.pos == len(self.code) - 1
-
-    def noop(self, addr, rwb):
-        print(f'noop cycle {addr:06x} {rwb=}')
-
-    def read(self, addr, vpa, vda, vpb):
-        print(f'read cycle {addr:06x} {vpa=} {vda=} {vpb=}')
-
-        v = self.code[self.pos]
-        self.pos += 1
-
-        print(f'=> {self.pos=} {v:x}')
-
-        return v
-
-    def write(self, addr, vpa, vda, vpb, value):
-        print(f'write cycle {addr:06x} {vpa=} {vda=} {vpb=} {value=}')
-
-
-client = UARTDebugHost("/dev/ttyUSB2")
-ctrl = SampleCtrl()
-
-print(client.peek8(0x008000))
-
-with client.tracing():
-    client.debug_with(ctrl)
-    while True:
-        client.trace_step()
