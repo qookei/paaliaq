@@ -5,7 +5,7 @@ from contextlib import contextmanager
 
 
 class UARTDebugHost:
-    def __init__(self, port, baud=115200):
+    def __init__(self, port, baud=2000000):
         self._ser = serial.Serial(port, baud)
 
     def _cmd(self, op, addr, wr_data):

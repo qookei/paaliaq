@@ -265,8 +265,8 @@ class FiniDriver(MemorylessDriver):
         self.state.dbr = w["dbr"]
 
 
-def run_test(port, test_file, test_nr):
-    client = UARTDebugHost(port)
+def run_test(port, baud, test_file, test_nr):
+    client = UARTDebugHost(port, baud)
     test = load_test(test_file, test_nr)
 
     print(f"Running test \"{test.name}\"")
@@ -288,11 +288,6 @@ def run_test(port, test_file, test_nr):
         client.debug_with(test_ctrl)
         print("Collecting final state")
         client.debug_with(fini_ctrl)
-        client.trace_step()
-        client.trace_step()
-        client.trace_step()
-        client.trace_step()
-        client.trace_step()
 
     pprint(test.cycles)
     pprint(test_ctrl.bus_activity)
@@ -304,8 +299,9 @@ def run_test(port, test_file, test_nr):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--serial-port", type=str, default="/dev/ttyUSB2")
+    parser.add_argument("--serial-baud", type=int, default=2000000)
     parser.add_argument("--test-file", type=str, required=True)
     parser.add_argument("--test-nr", type=int, required=True)
 
     args = parser.parse_args()
-    run_test(args.serial_port, args.test_file, args.test_nr)
+    run_test(args.serial_port, args.serial_baud, args.test_file, args.test_nr)
