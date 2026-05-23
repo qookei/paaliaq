@@ -63,7 +63,7 @@ class UARTDebugBridge(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.phy = phy = UARTDebugPhy()
+        m.submodules.phy = phy = UARTDebugPhy(baudrate=2000000)
 
         # Since our data bus is only 8 bits wide, SEL_O is just always 1.
         m.d.comb += self.wb_bus.sel.eq(1)
