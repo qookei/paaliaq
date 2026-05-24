@@ -1,9 +1,16 @@
 import argparse
 import json
+import time
 
 from dataclasses import dataclass
 from debug import UARTDebugHost
 from pprint import pprint
+
+
+SPINNER_CHARS = ["|", "/", "-", "\\"]
+spinner_pos = 0
+
+verbose = False
 
 
 @dataclass
@@ -31,6 +38,28 @@ class TestCase:
     final_mem: dict[int, int]
 
     cycles: list[list[int, int | None, str]]
+
+
+def compare_result(test, actual_mem, actual_cycles, actual_state):
+    success = True
+
+    if test.final_state != actual_state:
+        print("CPU state differs from expected final state")
+        pprint(test.final_state)
+        pprint(actual_state)
+        success = False
+    if test.cycles != actual_cycles:
+        print("CPU bus activity differs from expected activity")
+        pprint(test.cycles)
+        pprint(actual_cycles)
+        success = False
+    if any(actual_mem[i] != test.final_mem[i] for i in test.final_mem.keys()):
+        print("Final memory contents differ from expected contents")
+        pprint(test.final_mem)
+        pprint(actual_mem)
+        success = False
+
+    return success
 
 
 def load_test(test_file, test_nr):
@@ -102,7 +131,13 @@ class BaseDriver:
         data_str = "??" if data is None else f"{data:02x}"
 
         self.bus_activity.append([addr, data, ctrl_str])
-        print(f"{addr:06x} {data_str} {ctrl_str}")
+
+        if verbose:
+            print(f"{addr:06x} {data_str} {ctrl_str}")
+        else:
+            global spinner_pos
+            print(f"\b{SPINNER_CHARS[spinner_pos]}", end="", flush=True)
+            spinner_pos = (spinner_pos + 1) % len(SPINNER_CHARS)
 
     def noop(self, addr, rwb):
         self._note_cycle(addr, None, False, False, True, rwb)
@@ -151,7 +186,6 @@ class MemoryDriver(BaseDriver):
         super().__init__()
         self.cycles = cycles
         self.mem = mem
-        print(f"{self.cycles=}")
 
     def should_resume_after(self, addr, vpa, vda, vpb, rwb):
         return self.cycles == len(self.bus_activity) + 1, False
@@ -271,7 +305,7 @@ def run_test(port, baud, test_file, test_nr):
 
     print(f"Running test \"{test.name}\"")
 
-    # Prepare halt loop after test is over
+    # Prepare halt loop for after test is over
     client.poke8(0x000000, 0x5C)
     client.poke8(0x000001, 0x00)
     client.poke8(0x000002, 0x00)
@@ -281,19 +315,29 @@ def run_test(port, baud, test_file, test_nr):
     test_ctrl = MemoryDriver(dict(test.initial_mem), len(test.cycles))
     fini_ctrl = FiniDriver()
 
+    start_ts = time.monotonic()
+
+    def _step_with_log(ctrl, msg):
+        if verbose:
+            print(f"{msg}:")
+        else:
+            print(f"{msg}...  ", end="", flush=True)
+        client.debug_with(ctrl)
+        if not verbose:
+            print("\bdone")
+
     with client.tracing():
-        print("Setting up initial state")
-        client.debug_with(init_ctrl)
-        print("Running test")
-        client.debug_with(test_ctrl)
-        print("Collecting final state")
-        client.debug_with(fini_ctrl)
+        _step_with_log(init_ctrl, "Setting up initial state")
+        _step_with_log(test_ctrl, "Running test")
+        _step_with_log(fini_ctrl, "Collecting final state")
 
-    pprint(test.cycles)
-    pprint(test_ctrl.bus_activity)
+    end_ts = time.monotonic()
 
-    pprint(test.final_state)
-    pprint(fini_ctrl.state)
+    success = compare_result(test, test_ctrl.mem, test_ctrl.bus_activity, fini_ctrl.state)
+
+    print(f"Test \"{test.name}\" {'PASS' if success else 'FAIL'}, in {end_ts - start_ts:.2f} seconds")
+
+    return success
 
 
 if __name__ == "__main__":
