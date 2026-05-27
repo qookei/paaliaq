@@ -19,6 +19,17 @@ spinner_pos = 0
 verbose = False
 verbose_cycles = False
 quiet_run = False
+logfile = None
+
+
+def log(msg, *, show=None):
+    if show is None:
+        show = verbose
+    logfile.write(f"{msg}\n")
+    logfile.flush()
+
+    if show:
+        print(msg)
 
 
 @dataclass
@@ -53,64 +64,61 @@ def compare_result(test, actual_mem, actual_cycles, actual_state):
 
     if test.final_state != actual_state:
         success = False
-        if verbose:
-            print("CPU state differs from expected final state:")
-            print("    expected | actual")
+        log("CPU state differs from expected final state:")
+        log("    expected | actual")
 
-            def _diff2(name, attr):
-                final_v, actual_v = getattr(test.final_state, attr), getattr(actual_state, attr)
-                marker = "  <-- different" if final_v != actual_v else ""
-                print(f"  {name:>3}:   ${final_v:02x} | ${actual_v:02x}   {marker}")
+        def _diff2(name, attr):
+            final_v, actual_v = getattr(test.final_state, attr), getattr(actual_state, attr)
+            marker = "  <-- different" if final_v != actual_v else ""
+            log(f"  {name:>3}:   ${final_v:02x} | ${actual_v:02x}   {marker}")
 
-            def _diff4(name, attr):
-                final_v, actual_v = getattr(test.final_state, attr), getattr(actual_state, attr)
-                marker = "  <-- different" if final_v != actual_v else ""
-                print(f"  {name:>3}: ${final_v:04x} | ${actual_v:04x} {marker}")
+        def _diff4(name, attr):
+            final_v, actual_v = getattr(test.final_state, attr), getattr(actual_state, attr)
+            marker = "  <-- different" if final_v != actual_v else ""
+            log(f"  {name:>3}: ${final_v:04x} | ${actual_v:04x} {marker}")
 
-            marker = "  <-- different" if test.final_state.emul != actual_state.emul else ""
-            print(f"    E: {test.final_state.emul:>5} | {actual_state.emul:>5} {marker}")
-            _diff4("A", "a")
-            _diff4("X", "x")
-            _diff4("Y", "y")
-            _diff4("S", "s")
-            _diff4("D", "d")
-            _diff2("P", "p")
-            _diff4("PC", "pc")
-            _diff2("PBR", "pbr")
-            _diff2("DBR", "dbr")
+        marker = "  <-- different" if test.final_state.emul != actual_state.emul else ""
+        log(f"    E: {test.final_state.emul:>5} | {actual_state.emul:>5} {marker}")
+        _diff4("A", "a")
+        _diff4("X", "x")
+        _diff4("Y", "y")
+        _diff4("S", "s")
+        _diff4("D", "d")
+        _diff2("P", "p")
+        _diff4("PC", "pc")
+        _diff2("PBR", "pbr")
+        _diff2("DBR", "dbr")
     if test.cycles != actual_cycles:
         success = False
-        if verbose:
-            print("CPU bus activity differs from expected activity:")
-            print( "               expected | actual")
-            for i in range(max(len(test.cycles), len(actual_cycles))):
-                final_c = test.cycles[i] if i < len(test.cycles) else None
-                actual_c = actual_cycles[i] if i < len(actual_cycles) else None
+        log("CPU bus activity differs from expected activity:")
+        log( "               expected | actual")
+        for i in range(max(len(test.cycles), len(actual_cycles))):
+            final_c = test.cycles[i] if i < len(test.cycles) else None
+            actual_c = actual_cycles[i] if i < len(actual_cycles) else None
 
-                if final_c:
-                    data_str = "??" if final_c[1] is None else f"{final_c[1]:02x}"
-                    final_str = f"{final_c[0]:06x} {data_str} {final_c[2]}"
-                else:
-                    final_str = "   <missing>  "
+            if final_c:
+                data_str = "??" if final_c[1] is None else f"{final_c[1]:02x}"
+                final_str = f"{final_c[0]:06x} {data_str} {final_c[2]}"
+            else:
+                final_str = "   <missing>  "
 
-                if actual_c:
-                    data_str = "??" if actual_c[1] is None else f"{actual_c[1]:02x}"
-                    actual_str = f"{actual_c[0]:06x} {data_str} {actual_c[2]}"
-                else:
-                    actual_str = "  <missing>   "
+            if actual_c:
+                data_str = "??" if actual_c[1] is None else f"{actual_c[1]:02x}"
+                actual_str = f"{actual_c[0]:06x} {data_str} {actual_c[2]}"
+            else:
+                actual_str = "  <missing>   "
 
-                marker = "  <-- different" if final_c != actual_c else ""
+            marker = "  <-- different" if final_c != actual_c else ""
 
-                print(f"  {i + 1:>5}. {final_str} | {actual_str}{marker}")
+            log(f"  {i + 1:>5}. {final_str} | {actual_str}{marker}")
     if any(actual_mem.get(i, 0) != test.final_mem[i] for i in test.final_mem.keys()):
         success = False
-        if verbose:
-            print("Final memory contents differ from expected contents:")
-            print("            expected != actual")
-            for addr in test.final_mem.keys():
-                final_v, actual_v = test.final_mem[i], actual_mem.get(i, 0)
-                if final_v != actual_v:
-                    print(f"  Byte at ${addr:06x}: {final_v:02x} != {actual_v:02x}")
+        log("Final memory contents differ from expected contents:")
+        log("            expected != actual")
+        for addr in test.final_mem.keys():
+            final_v, actual_v = test.final_mem[i], actual_mem.get(i, 0)
+            if final_v != actual_v:
+                log(f"  Byte at ${addr:06x}: {final_v:02x} != {actual_v:02x}")
 
     return success
 
@@ -188,9 +196,8 @@ class BaseDriver:
 
         self.bus_activity.append([addr, data, ctrl_str])
 
-        if verbose_cycles:
-            print(f"{addr:06x} {data_str} {ctrl_str}")
-        elif not quiet_run:
+        log(f"{addr:06x} {data_str} {ctrl_str}", show=verbose_cycles)
+        if not quiet_run and not verbose_cycles:
             global spinner_pos
             print(f"\b{SPINNER_CHARS[spinner_pos]}", end="", flush=True)
             spinner_pos = (spinner_pos + 1) % len(SPINNER_CHARS)
@@ -359,8 +366,7 @@ class FiniDriver(MemorylessDriver):
 
 
 def run_test(client, test):
-    if not quiet_run:
-        print(f"Running test \"{test.name}\"")
+    log(f"Running test \"{test.name}\"", show=not quiet_run)
 
     # Prepare halt loop for after test is over
     client.poke8(0x000000, 0x5C)
@@ -375,9 +381,8 @@ def run_test(client, test):
     start_ts = time.monotonic()
 
     def _step_with_log(ctrl, msg):
-        if verbose_cycles:
-            print(f"  {msg}:")
-        elif not quiet_run:
+        log(f"  {msg}:", show=verbose_cycles)
+        if not verbose_cycles and not quiet_run:
             print(f"  {msg}...  ", end="", flush=True)
         client.debug_with(ctrl)
         if not verbose_cycles and not quiet_run:
@@ -392,8 +397,10 @@ def run_test(client, test):
 
     success = compare_result(test, test_ctrl.mem, test_ctrl.bus_activity[:-1], fini_ctrl.state)
 
-    if not quiet_run:
-        print(f"Test \"{test.name}\" {'PASS' if success else 'FAIL'}, in {end_ts - start_ts:.2f} seconds")
+    log(
+        f"Test \"{test.name}\" {'PASS' if success else 'FAIL'}, in {end_ts - start_ts:.2f} seconds",
+        show=not quiet_run,
+    )
 
     return success
 
@@ -410,20 +417,20 @@ def main(port, baud, tests):
     n_pass = len([result for result in results.values() if result])
     pct_pass = n_pass / n_ran * 100
 
-    print("\n\nAll done!")
-    print(f"Summary:  {n_pass} successes out of {n_ran} tests ({pct_pass:.2f}%).")
+    log("\n\nAll done!", show=True)
+    log(f"Summary:  {n_pass} successes out of {n_ran} tests ({pct_pass:.2f}%).", show=True)
     if n_pass != n_ran:
-        print("Summary of failing tests:")
+        log("Summary of failing tests:", show=True)
         for mode in ["e", "n"]:
             for opcode in range(256):
                 fails = []
-                for i in indices:
+                for i in range(1, 10001):
                     name = f"{opcode:02x} {mode} {i}"
                     if name in results and not results[name]:
                         fails.append(i)
                 if fails:
-                    print(f"  Opcode {opcode:02x} (mode {mode}) has {len(fails)} failures")
-                    print(f"    First {min(10, len(fails))} are at indices: {fails[:10]}")
+                    log(f"  Opcode {opcode:02x} (mode {mode}) has {len(fails)} failures", show=True)
+                    log(f"    First {min(10, len(fails))} are at indices: {fails[:10]}", show=True)
         if not verbose:
             print("Rerun with --verbose to see a detailed breakdown.")
 
@@ -461,6 +468,8 @@ def collect_tests(test_dir, selected_tests, emul, native, select, limit, random_
             indices = select
         else:
             indices = range(1, limit + 1)
+
+        log(f"Collecting tests from {test_file} ({len(indices)} tests)")
 
         for index in indices:
             test_cases = load_test_file(test_file)
@@ -501,6 +510,8 @@ if __name__ == "__main__":
     if args.verbose_cycles and args.quiet_run:
         print("--verbose-cycles and --quiet-run are exclusive.")
         sys.exit()
+
+    logfile = open("test.log", "w+")
 
     print(f"Collecting tests...")
     tests = collect_tests(
