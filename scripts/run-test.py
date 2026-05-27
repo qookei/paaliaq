@@ -437,13 +437,6 @@ def collect_tests(test_dir, selected_tests, emul, native, select, limit, random_
     exclude = [int(nr, 16) for nr in exclude]
     selected_tests = [nr for nr in selected_tests if nr not in exclude]
 
-    if random_sample:
-        indices = random.sample(range(1, 10001), k=limit)
-    elif select:
-        indices = select
-    else:
-        indices = range(1, limit + 1)
-
     test_files = []
 
     if not native and not emul:
@@ -459,14 +452,21 @@ def collect_tests(test_dir, selected_tests, emul, native, select, limit, random_
             test_dir / f"{nr:02x}.e.json" for nr in selected_tests
         ]
 
-    tests = list(itertools.product(test_files, indices))
-    random.shuffle(tests)
+    tests = []
 
-    print(f"Collected {len(tests)} tests.")
+    for test_file in tqdm.tqdm(test_files):
+        if random_sample:
+            indices = random.sample(range(1, 10001), k=limit)
+        elif select:
+            indices = select
+        else:
+            indices = range(1, limit + 1)
 
-    for test_file, index in tests:
-        test_cases = load_test_file(test_file)
-        yield test_cases[index - 1]
+        for index in indices:
+            test_cases = load_test_file(test_file)
+            tests.append(test_cases[index - 1])
+
+    return tests
 
 
 if __name__ == "__main__":
@@ -502,6 +502,7 @@ if __name__ == "__main__":
         print("--verbose-cycles and --quiet-run are exclusive.")
         sys.exit()
 
+    print(f"Collecting tests...")
     tests = collect_tests(
         Path(args.test_dir),
         args.tests,
@@ -512,5 +513,7 @@ if __name__ == "__main__":
         args.random_sample,
         args.exclude,
     )
+    random.shuffle(tests)
+    print(f"Collected {len(tests)} tests. Running...")
 
-    main(args.serial_port, args.serial_baud, list(tests))
+    main(args.serial_port, args.serial_baud, tests)
