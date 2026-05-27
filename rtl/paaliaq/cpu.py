@@ -190,7 +190,7 @@ class W65C816WishboneBridge(wiring.Component):
         # 4? -> 5) tMDS: max 40 ns
 
         # Times in nanoseconds
-        tDSR = 10 # Before falling edge, read setup time
+        tDSR = 20 # Before falling edge, read setup time
         tDHR = 10 # From falling edge, read hold time
         tADS = 115 # From falling edge to when full address is available
         tMDS = 60 # From rising edge to when data bus has write data
