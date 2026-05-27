@@ -202,8 +202,8 @@ class BaseDriver:
             print(f"\b{SPINNER_CHARS[spinner_pos]}", end="", flush=True)
             spinner_pos = (spinner_pos + 1) % len(SPINNER_CHARS)
 
-    def noop(self, addr, vpb, rwb):
-        self._note_cycle(addr, None, False, False, vpb, rwb)
+    def noop(self, addr, vpb, rwb, value):
+        self._note_cycle(addr, value, False, False, vpb, rwb)
 
     def read(self, addr, vpa, vda, vpb):
         if vpa and vda:

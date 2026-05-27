@@ -121,7 +121,7 @@ class UARTDebugHost:
             self.poke8(0x10408, 0x0d)
 
         if not (vda or vpa):
-            ctrl.noop(va, vpb, rwb)
+            ctrl.noop(va, vpb, rwb, self.peek8(0x10410) if not rwb else None)
         elif rwb:
             self.poke8(0x1040a, ctrl.read(va, vpa, vda, vpb))
         else:
