@@ -190,6 +190,7 @@ class W65C816WishboneBridge(wiring.Component):
         # 4? -> 5) tMDS: max 40 ns
 
         # Times in nanoseconds
+        tDSR = 10 # Before falling edge, read setup time
         tDHR = 10 # From falling edge, read hold time
         tADS = 115 # From falling edge to when full address is available
         tMDS = 60 # From rising edge to when data bus has write data
@@ -220,9 +221,13 @@ class W65C816WishboneBridge(wiring.Component):
         wait_noop_ctr = Signal(range(clks_wait_noop + 1))
         print(f'No-op cycles will wait for {clks_wait_noop} clocks')
 
-        clks_wait_read = ns_to_cycles(tPWH)
-        wait_read_ctr = Signal(range(clks_wait_read + 1))
-        print(f'Read cycles will wait for {clks_wait_read} clocks')
+        clks_wait_read_cycle = ns_to_cycles(tPWH - tDSR)
+        wait_read_cycle_ctr = Signal(range(clks_wait_read_cycle + 1))
+        print(f'Read cycles will wait for {clks_wait_read_cycle} clocks before setup time')
+
+        clks_wait_read_setup = ns_to_cycles(tDSR)
+        wait_read_setup_ctr = Signal(range(clks_wait_read_setup + 1))
+        print(f'Read cycles will setup data {clks_wait_read_setup} clocks before next cycle')
 
         clks_wait_write = ns_to_cycles(tPWH - tMDS)
         wait_write_ctr = Signal(range(clks_wait_write + 1))
@@ -421,17 +426,21 @@ class W65C816WishboneBridge(wiring.Component):
 
             with m.State('initiate-read'):
                 m.d.sync += [
-                    wait_read_ctr.eq(0),
+                    wait_read_cycle_ctr.eq(0),
+                    wait_read_setup_ctr.eq(0),
                     read_in_progress.eq(1),
                     self.wb_bus.cyc.eq(~dbg_en),
                     self.wb_bus.we.eq(0),
                 ]
                 m.next = 'complete-read'
             with m.State('complete-read'):
-                with m.If(wait_read_ctr != clks_wait_read):
-                    m.d.sync += wait_read_ctr.eq(wait_read_ctr + 1)
+                with m.If(wait_read_cycle_ctr != clks_wait_read_cycle):
+                    m.d.sync += wait_read_cycle_ctr.eq(wait_read_cycle_ctr + 1)
                 with m.Elif(~read_in_progress):
-                    m.next = 'clk-falling-edge'
+                    with m.If(wait_read_setup_ctr != clks_wait_read_setup):
+                        m.d.sync += wait_read_setup_ctr.eq(wait_read_setup_ctr + 1)
+                    with m.Else():
+                        m.next = 'clk-falling-edge'
 
             with m.State('initiate-write'):
                 with m.If(w_data_valid_ctr != clks_w_data_valid):
