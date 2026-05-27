@@ -410,7 +410,7 @@ class W65C816WishboneBridge(wiring.Component):
                 ]
                 with m.If(trace_en & trace_halted):
                     pass
-                with m.Elif(~((cpu_io.vda | cpu_io.vpa) & ~aborted & ~aborted_q & ~rst_before_vp)):
+                with m.Elif(~((cpu_io.vda | cpu_io.vpa) & ~aborted & ~aborted_q & ~rst_before_vp) & ~(dbg_en & ~cpu_io.rw)):
                     m.d.sync += wait_noop_ctr.eq(0)
                     m.next = 'noop-cycle'
                 with m.Elif(cpu_io.rw):
