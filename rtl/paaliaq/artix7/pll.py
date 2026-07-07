@@ -12,7 +12,7 @@ class PLLOutputParams:
 
 
 class S7MMCM(Elaboratable):
-    def __init__(self):
+    def __init__(self, max_error=0.0005):
         super().__init__()
 
         self._input_clk = None
@@ -20,6 +20,8 @@ class S7MMCM(Elaboratable):
 
         self._primary = None
         self._secondaries = []
+
+        self._max_error = max_error
 
     def add_input(self, *, clk, freq):
         assert (self._input_clk is None) == (self._input_freq is None)
@@ -35,9 +37,6 @@ class S7MMCM(Elaboratable):
     def add_primary_output(self, *, domain="sync", freq, phase=0):
         if self._primary:
             raise RuntimeError("PLL already has a primary output")
-        freq_MHz = freq // 1e6
-        if freq_MHz * 1e6 != freq:
-            raise RuntimeError(f"Output clock frequency {freq} must be an integer multiple of MHz")
 
         self._primary = PLLOutputParams(
             domain=domain,
@@ -48,9 +47,6 @@ class S7MMCM(Elaboratable):
     def add_secondary_output(self, *, domain, freq, phase=0):
         if len(self._secondaries) == 5:
             raise RuntimeError("PLL is out of usable secondary outputs")
-        freq_MHz = freq // 1e6
-        if freq_MHz * 1e6 != freq:
-            raise RuntimeError(f"Output clock frequency {freq} must be an integer multiple of MHz")
 
         self._secondaries += [PLLOutputParams(
             domain=domain,
@@ -82,7 +78,7 @@ class S7MMCM(Elaboratable):
         in_MHz = self._input_freq // 1e6
 
         all_out = [self._primary] + self._secondaries
-        all_out_MHz = [x.freq // 1e6 for x in all_out]
+        all_out_MHz = [x.freq / 1e6 for x in all_out]
         max_out_MHz = max(all_out_MHz)
 
         best_in_div = -1
@@ -96,7 +92,8 @@ class S7MMCM(Elaboratable):
             fpfd = in_MHz / in_div
             if fpfd < PFD_MIN or fpfd > PFD_MAX:
                 continue
-            for fb_mul in range(2, 64+1):
+            for fb_mul_raw in range(2*8, 64*8+1):
+                fb_mul = fb_mul_raw / 8
                 for out_div in range(1, 128+1):
                     fvco = fpfd * fb_mul
                     if fvco < VCO_MIN or fvco > VCO_MAX:
@@ -113,10 +110,11 @@ class S7MMCM(Elaboratable):
                         best_fvco = fvco
                         best_fout = fout
 
-        if best_fout != max_out_MHz:
+        fout_error = abs(best_fout - max_out_MHz) / max_out_MHz
+        if fout_error > self._max_error:
             raise RuntimeError(
                 f"Failed to find PLL configuration that reaches primary frequency {max_out_MHz * 1e6}"
-                f" (closest found is {best_fout * 1e6})"
+                f" (closest found is {best_fout * 1e6}, with error {fout_error * 100}%)"
             )
 
         pll_params = {}
