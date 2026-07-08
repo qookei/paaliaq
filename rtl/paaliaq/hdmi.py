@@ -60,11 +60,11 @@ class TMDSEncoder(wiring.Component):
                 total_balance.eq(0),
                 self.data_out.eq(
                     Array([
-                        0b0010101011,
-                        0b0010101010,
                         0b1101010100,
-                        0b1101010101,
-                    ])[Cat(self.c1, self.c0)]
+                        0b0010101011,
+                        0b0101010100,
+                        0b1010101011,
+                    ])[Cat(self.c0, self.c1)]
                 ),
             ]
 
