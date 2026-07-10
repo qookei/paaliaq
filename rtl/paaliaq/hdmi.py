@@ -199,9 +199,14 @@ class VideoSequencer(wiring.Component):
         h_active = (h_pos >= mode.h_active_start) & (h_pos < mode.h_active_end)
         v_active = (v_pos >= mode.v_active_start) & (v_pos < mode.v_active_end)
 
+        first_v_sync_line = v_pos == mode.v_sync_start
+        last_v_sync_line = v_pos == mode.v_sync_start + mode.v_sync - 1
+        v_sync = v_pos >= mode.v_sync_start
+        h_sync = h_pos >= mode.h_sync_start
+
         m.d.sync += [
-            self.h_sync.eq(h_pos >= mode.h_sync_start),
-            self.v_sync.eq(v_pos >= mode.v_sync_start),
+            self.h_sync.eq(h_sync),
+            self.v_sync.eq(Mux(first_v_sync_line, h_sync, Mux(last_v_sync_line, ~h_sync, v_sync))),
             self.active.eq(h_active & v_active),
         ]
 
