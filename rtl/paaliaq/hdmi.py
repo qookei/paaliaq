@@ -201,7 +201,7 @@ class VideoSequencer(wiring.Component):
 
         m.d.sync += [
             self.h_sync.eq(h_pos >= mode.h_sync_start),
-            self.h_sync.eq(v_pos >= mode.v_sync_start),
+            self.v_sync.eq(v_pos >= mode.v_sync_start),
             self.active.eq(h_active & v_active),
         ]
 
