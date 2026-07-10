@@ -116,7 +116,7 @@ def compare_result(test, actual_mem, actual_cycles, actual_state):
         log("Final memory contents differ from expected contents:")
         log("            expected != actual")
         for addr in test.final_mem.keys():
-            final_v, actual_v = test.final_mem[i], actual_mem.get(i, 0)
+            final_v, actual_v = test.final_mem[addr], actual_mem.get(addr, 0)
             if final_v != actual_v:
                 log(f"  Byte at ${addr:06x}: {final_v:02x} != {actual_v:02x}")
 
