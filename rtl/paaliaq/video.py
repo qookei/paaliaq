@@ -470,16 +470,14 @@ class TextFramebuffer(wiring.Component):
     wb_bus: In(wishbone.Signature(addr_width=15, data_width=8))
     csr_bus: wiring.In(csr.Signature(addr_width=4, data_width=8))
 
-    class CursorRegister(csr.Register, access="rw"):
-        x: csr.Field(csr.action.RW, 16)
-        y: csr.Field(csr.action.RW, 16)
-
+    class CharRegister(csr.Register, access="w"):
+        char: csr.Field(csr.action.W, 8)
 
     def __init__(self):
         super().__init__()
 
         regs = csr.Builder(addr_width=4, data_width=8)
-        self._cursor = regs.add("Cursor", self.CursorRegister())
+        self._char = regs.add("Char", self.CharRegister())
         mmap = regs.as_memory_map()
         self._bridge = csr.Bridge(mmap)
         self.csr_bus.memory_map = mmap
@@ -501,6 +499,8 @@ class TextFramebuffer(wiring.Component):
 
         m.submodules.enc = enc = HDMIEncoder()
         m.submodules.seq = seq = DomainRenamer("pixel")(VideoSequencer(mode, pipeline_depth=3))
+        m.submodules.cmd = cmd = DomainRenamer("pixel")(TextCommandProcessor())
+        m.submodules.ansi = ansi = DomainRenamer("pixel")(TextAnsiEscProcessor())
 
         m.d.comb += [
             enc.h_sync.eq(seq.h_sync),
@@ -517,10 +517,18 @@ class TextFramebuffer(wiring.Component):
             init=get_font_data(),
         )
 
+        init = []
+        for i in range(128 * 48):
+            init.append(CharacterCell.const({
+                "char": ord(" "),
+                "fg": 15,
+                "bg": 0,
+            }))
+
         m.submodules.text = text = memory.Memory(
-            shape=unsigned(32),
+            shape=CharacterCell,
             depth=128*48,
-            init=[],
+            init=init,
         )
 
         def delayed(sig, by):
@@ -532,9 +540,6 @@ class TextFramebuffer(wiring.Component):
 
             return x
 
-        cursor_x = Signal(range(128))
-        cursor_y = Signal(range(48))
-
         cursor_blink = Signal(range(64))
         with m.If(seq.v_start):
             m.d.pixel += cursor_blink.eq(cursor_blink + 1)
@@ -545,7 +550,9 @@ class TextFramebuffer(wiring.Component):
         m.d.comb += text_rd.addr.eq((seq.h_pos >> 3) + (seq.v_pos >> 4) * 128)
 
         char, fg, bg = Signal(8), Signal(8), Signal(8)
-        m.d.comb += Cat(char, fg, bg).eq(text_rd.data)
+        m.d.comb += char.eq(text_rd.data.char)
+        m.d.comb += fg.eq(text_rd.data.fg)
+        m.d.comb += bg.eq(text_rd.data.bg)
 
         m.d.comb += font_rd.addr.eq(char * 16 + (seq.v_pos & 15))
 
@@ -553,7 +560,7 @@ class TextFramebuffer(wiring.Component):
 
         cell_x = delayed(seq.h_pos, 2)
         font_bit = font_rd.data[::-1].bit_select(cell_x & 7, 1)
-        in_cursor_cell = ((cell_x >> 3) == cursor_x) & ((seq.v_pos >> 4) == cursor_y)
+        in_cursor_cell = ((cell_x >> 3) == cmd.cursor_x) & ((seq.v_pos >> 4) == cmd.cursor_y)
         in_cursor_line = in_cursor_cell & ((seq.v_pos & 0b1110) == 0b1110) & ((cursor_blink >> 4) & 1)
         bit = in_cursor_line | font_bit
 
@@ -562,51 +569,30 @@ class TextFramebuffer(wiring.Component):
         )
 
         # ---
-        # Wishbone text buffer access
+        # Command processor wiring - framebuffer
 
-        text_bus_rd = text.read_port()
-        text_wr = text.write_port(granularity=8)
-        m.d.comb += [
-            text_bus_rd.addr.eq(self.wb_bus.adr >> 2),
-            text_wr.addr.eq(self.wb_bus.adr >> 2),
-            text_wr.data.eq(self.wb_bus.dat_w.replicate(4)),
-            self.wb_bus.dat_r.eq(text_bus_rd.data.word_select(self.wb_bus.adr & 3, 8)),
-        ]
+        text_cmd_rd = text.read_port(domain="pixel")
+        text_cmd_wr = text.write_port(domain="pixel")
 
-        with m.If(self.wb_bus.ack):
-            m.d.sync += self.wb_bus.ack.eq(0)
-        with m.Elif(self.wb_bus.cyc & self.wb_bus.stb):
-            m.d.comb += text_wr.en.eq(Mux(self.wb_bus.we, 1 << (self.wb_bus.adr & 3), 0))
-            m.d.comb += text_bus_rd.en.eq(~self.wb_bus.we)
-            m.d.sync += self.wb_bus.ack.eq(1)
+        wiring.connect(m, text_cmd_rd, cmd.fb_read)
+        wiring.connect(m, text_cmd_wr, cmd.fb_write)
+
+        wiring.connect(m, ansi.commands, cmd.commands)
 
         # ---
-        # Cursor register CDC
+        # Character register CDC
 
-        m.submodules.cursor_cdc_fifo = cursor_cdc_fifo = AsyncFIFOBuffered(
-            width=13,
+        m.submodules.char_cdc_fifo = char_cdc_fifo = AsyncFIFOBuffered(
+            width=8,
             depth=4,
             w_domain="sync",
             r_domain="pixel")
 
-        stb = self._cursor.f.x.port.w_stb | self._cursor.f.y.port.w_stb
-
         m.d.comb += [
-            cursor_cdc_fifo.w_data.eq(
-                Cat(
-                    self._cursor.f.x.data.bit_select(0, 7),
-                    self._cursor.f.y.data.bit_select(0, 6)
-                )
-            ),
-            cursor_cdc_fifo.w_en.eq(stb),
+            char_cdc_fifo.w_data.eq(self._char.f.char.w_data),
+            char_cdc_fifo.w_en.eq(self._char.f.char.w_stb),
         ]
 
-        with m.If(cursor_cdc_fifo.r_rdy & ~cursor_cdc_fifo.r_en):
-            m.d.pixel += [
-                Cat(cursor_x, cursor_y).eq(cursor_cdc_fifo.r_data),
-                cursor_cdc_fifo.r_en.eq(1),
-            ]
-        with m.Else():
-            m.d.pixel += cursor_cdc_fifo.r_en.eq(0)
+        wiring.connect(m, ansi.chars, char_cdc_fifo.r_stream)
 
         return m
