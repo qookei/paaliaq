@@ -17,7 +17,7 @@ from paaliaq.mmu import MMU
 
 from paaliaq.wb_cut import WishboneCut
 
-from paaliaq.video import TextFramebuffer
+from paaliaq.video import TextAnsiTerminal
 
 from paaliaq.spi import SPIController
 
@@ -149,10 +149,8 @@ class SoC(Elaboratable):
 
         csr_dec.add(cpu_bridge.csr_bus, name='dbg')
 
-        m.submodules.gen = gen = TextFramebuffer()
-        m.submodules.gen_cut = gen_cut = WishboneCut(gen.wb_bus)
-        wb_dec.add(gen_cut.wb_bus, addr=0x100000, name="text")
-        csr_dec.add(gen.csr_bus, name="text")
+        m.submodules.terminal = terminal = TextAnsiTerminal()
+        csr_dec.add(terminal.csr_bus, name="terminal")
 
         m.submodules.spi = spi = SPIController()
         csr_dec.add(spi.csr_bus, name="spi")

@@ -478,30 +478,12 @@ class TextAnsiEscProcessor(wiring.Component):
 
 
 class TextFramebuffer(wiring.Component):
-    wb_bus: In(wishbone.Signature(addr_width=15, data_width=8))
-    csr_bus: wiring.In(csr.Signature(addr_width=4, data_width=8))
-
-    class CharRegister(csr.Register, access="w"):
-        char: csr.Field(csr.action.W, 8)
-
-    def __init__(self):
-        super().__init__()
-
-        regs = csr.Builder(addr_width=4, data_width=8)
-        self._char = regs.add("Char", self.CharRegister())
-        mmap = regs.as_memory_map()
-        self._bridge = csr.Bridge(mmap)
-        self.csr_bus.memory_map = mmap
-
-        self.wb_bus.memory_map = MemoryMap(addr_width=15, data_width=8)
-        self.wb_bus.memory_map.add_resource(self, name=("text",), size=128*48*4)
-        self.wb_bus.memory_map.freeze()
+    fb_read: In(memory.ReadPort.Signature(addr_width=13, shape=CharacterCell))
+    cursor_x: In(7)
+    cursor_y: In(6)
 
     def elaborate(self, platform):
         m = Module()
-
-        m.submodules.bridge = self._bridge
-        wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
 
         # ---
         # Signal generation logic
@@ -510,8 +492,6 @@ class TextFramebuffer(wiring.Component):
 
         m.submodules.enc = enc = HDMIEncoder()
         m.submodules.seq = seq = DomainRenamer("pixel")(VideoSequencer(mode, pipeline_depth=3))
-        m.submodules.cmd = cmd = DomainRenamer("pixel")(TextCommandProcessor())
-        m.submodules.ansi = ansi = DomainRenamer("pixel")(TextAnsiEscProcessor())
 
         m.d.comb += [
             enc.h_sync.eq(seq.h_sync),
@@ -528,6 +508,77 @@ class TextFramebuffer(wiring.Component):
             init=get_font_data(),
         )
 
+        def delayed(sig, by):
+            x = sig
+            for i in range(by):
+                y = Signal.like(sig)
+                m.d.sync += y.eq(x)
+                x = y
+
+            return x
+
+        cursor_blink = Signal(range(64))
+        with m.If(seq.v_start):
+            m.d.sync += cursor_blink.eq(cursor_blink + 1)
+
+        font_rd = font.read_port(domain="pixel")
+
+        m.d.comb += self.fb_read.addr.eq((seq.h_pos >> 3) + (seq.v_pos >> 4) * 128)
+
+        char, fg, bg = Signal(8), Signal(8), Signal(8)
+        m.d.comb += char.eq(self.fb_read.data.char)
+        m.d.comb += fg.eq(self.fb_read.data.fg)
+        m.d.comb += bg.eq(self.fb_read.data.bg)
+
+        m.d.comb += font_rd.addr.eq(char * 16 + (seq.v_pos & 15))
+
+        colors = Array(gen_color_palette())
+
+        cell_x = delayed(seq.h_pos, 2)
+        font_bit = font_rd.data[::-1].bit_select(cell_x & 7, 1)
+        in_cursor_cell = ((cell_x >> 3) == self.cursor_x) & ((seq.v_pos >> 4) == self.cursor_y)
+        in_cursor_line = in_cursor_cell & ((seq.v_pos & 0b1110) == 0b1110) & ((cursor_blink >> 4) & 1)
+        bit = in_cursor_line | font_bit
+
+        m.d.sync += Cat(enc.blue, enc.green, enc.red).eq(
+            colors[Mux(bit, delayed(fg, 1), delayed(bg, 1))]
+        )
+
+        return m
+
+
+class TextAnsiTerminal(wiring.Component):
+    csr_bus: wiring.In(csr.Signature(addr_width=4, data_width=8))
+
+    class CharRegister(csr.Register, access="w"):
+        char: csr.Field(csr.action.W, 8)
+
+    def __init__(self):
+        super().__init__()
+
+        regs = csr.Builder(addr_width=4, data_width=8)
+        self._char = regs.add("Char", self.CharRegister())
+        mmap = regs.as_memory_map()
+
+        self._bridge = csr.Bridge(mmap)
+        self.csr_bus.memory_map = mmap
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.bridge = self._bridge
+        wiring.connect(m, wiring.flipped(self.csr_bus), self._bridge.bus)
+
+        m.submodules.fb = fb = DomainRenamer("pixel")(TextFramebuffer())
+        m.submodules.cmd = cmd = DomainRenamer("pixel")(TextCommandProcessor())
+        m.submodules.ansi = ansi = DomainRenamer("pixel")(TextAnsiEscProcessor())
+
+        m.d.comb += fb.cursor_x.eq(cmd.cursor_x)
+        m.d.comb += fb.cursor_y.eq(cmd.cursor_y)
+
+        # ---
+        # Framebuffer memory
+
         init = []
         for i in range(128 * 48):
             init.append(CharacterCell.const({
@@ -542,56 +593,16 @@ class TextFramebuffer(wiring.Component):
             init=init,
         )
 
-        def delayed(sig, by):
-            x = sig
-            for i in range(by):
-                y = Signal.like(sig)
-                m.d.pixel += y.eq(x)
-                x = y
-
-            return x
-
-        cursor_blink = Signal(range(64))
-        with m.If(seq.v_start):
-            m.d.pixel += cursor_blink.eq(cursor_blink + 1)
-
-        font_rd = font.read_port(domain="pixel")
-        text_rd = text.read_port(domain="pixel")
-
-        m.d.comb += text_rd.addr.eq((seq.h_pos >> 3) + (seq.v_pos >> 4) * 128)
-
-        char, fg, bg = Signal(8), Signal(8), Signal(8)
-        m.d.comb += char.eq(text_rd.data.char)
-        m.d.comb += fg.eq(text_rd.data.fg)
-        m.d.comb += bg.eq(text_rd.data.bg)
-
-        m.d.comb += font_rd.addr.eq(char * 16 + (seq.v_pos & 15))
-
-        colors = Array(gen_color_palette())
-
-        cell_x = delayed(seq.h_pos, 2)
-        font_bit = font_rd.data[::-1].bit_select(cell_x & 7, 1)
-        in_cursor_cell = ((cell_x >> 3) == cmd.cursor_x) & ((seq.v_pos >> 4) == cmd.cursor_y)
-        in_cursor_line = in_cursor_cell & ((seq.v_pos & 0b1110) == 0b1110) & ((cursor_blink >> 4) & 1)
-        bit = in_cursor_line | font_bit
-
-        m.d.pixel += Cat(enc.blue, enc.green, enc.red).eq(
-            colors[Mux(bit, delayed(fg, 1), delayed(bg, 1))]
-        )
-
-        # ---
-        # Command processor wiring - framebuffer
+        text_fb_rd = text.read_port(domain="pixel")
+        wiring.connect(m, text_fb_rd, fb.fb_read)
 
         text_cmd_rd = text.read_port(domain="pixel")
         text_cmd_wr = text.write_port(domain="pixel")
-
         wiring.connect(m, text_cmd_rd, cmd.fb_read)
         wiring.connect(m, text_cmd_wr, cmd.fb_write)
 
-        wiring.connect(m, ansi.commands, cmd.commands)
-
         # ---
-        # Character register CDC
+        # Character input processing
 
         m.submodules.char_cdc_fifo = char_cdc_fifo = AsyncFIFOBuffered(
             width=8,
@@ -605,5 +616,6 @@ class TextFramebuffer(wiring.Component):
         ]
 
         wiring.connect(m, ansi.chars, char_cdc_fifo.r_stream)
+        wiring.connect(m, ansi.commands, cmd.commands)
 
         return m
