@@ -231,7 +231,6 @@ class TextCommandProcessor(wiring.Component):
                 m.d.sync += cur_attr.eq(cur_command.params.attr)
                 m.next = "idle"
             with m.State("handle-SCROLL"):
-                m.d.sync += cursor_y.eq(saturate(cursor_y + cur_command.params.rel_pos.delta, 47))
                 with m.If(cur_command.params.rel_pos.delta > 0):
                     m.d.sync += scroll_src.eq(128 * cur_command.params.rel_pos.delta)
                     m.d.sync += scroll_dst.eq(0)
