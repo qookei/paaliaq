@@ -93,6 +93,7 @@ class Command(data.Struct):
         })
         rel_pos: data.StructLayout({
             "x_axis": unsigned(1),
+            "reset_other": unsigned(1),
             "delta": signed(8),
         })
         erase: data.StructLayout({
@@ -251,8 +252,12 @@ class TextCommandProcessor(wiring.Component):
             with m.State("handle-MOVE_CURSOR_REL"):
                 with m.If(cur_command.params.rel_pos.x_axis):
                     m.d.sync += cursor_x.eq(saturate(cursor_x + cur_command.params.rel_pos.delta, 127))
+                    with m.If(cur_command.params.rel_pos.reset_other):
+                        m.d.sync += cursor_y.eq(0)
                 with m.Else():
                     m.d.sync += cursor_y.eq(saturate(cursor_y + cur_command.params.rel_pos.delta, 47))
+                    with m.If(cur_command.params.rel_pos.reset_other):
+                        m.d.sync += cursor_x.eq(0)
                 m.next = "idle"
             with m.State("handle-ERASE_LINE"):
                 line_start = cursor_y * 128
@@ -296,7 +301,6 @@ class TextCommandProcessor(wiring.Component):
                 with m.Else():
                     m.d.sync += scroll_src.eq(scroll_src - 1)
                 m.next = "do-scroll-write"
-                pass
             with m.State("do-scroll-write"):
                 with m.If((scroll_dst >= 0) & (scroll_dst < 128 * 48)):
                     m.d.comb += self.fb_write.en.eq(1)
@@ -374,7 +378,6 @@ class TextAnsiEscProcessor(wiring.Component):
                             m.d.sync += self.commands.payload.opcode.eq(Opcode.RESET)
                         with m.Default():
                             pass
-
                 with m.State("csi-begin"):
                     with m.If((self.chars.payload == ord("?")) & ~csi_question_mark):
                         m.d.comb += self.chars.ready.eq(1)
@@ -385,7 +388,6 @@ class TextAnsiEscProcessor(wiring.Component):
                         m.next = "csi-numarg"
                     with m.Else():
                         m.next = "csi-act"
-
                 with m.State("csi-numarg"):
                     with m.If((self.chars.payload >= ord("0")) & (self.chars.payload <= ord("9"))):
                         m.d.comb += self.chars.ready.eq(1)
@@ -397,10 +399,9 @@ class TextAnsiEscProcessor(wiring.Component):
                     with m.Else():
                         m.d.sync += num_idx.eq(num_idx + 1)
                         m.next = "csi-act"
-
                 with m.State("csi-act"):
+                    m.next = "idle"
                     m.d.comb += self.chars.ready.eq(1)
-
                     with m.Switch(self.chars.payload):
                         with m.Case(ord("A")):
                             m.d.sync += self.commands.valid.eq(1)
@@ -423,11 +424,17 @@ class TextAnsiEscProcessor(wiring.Component):
                             m.d.sync += self.commands.payload.params.rel_pos.x_axis.eq(1)
                             m.d.sync += self.commands.payload.params.rel_pos.delta.eq(-arg_val(0, 1))
                         with m.Case(ord("E")):
-                            # TODO: Next Line
-                            pass
+                            m.d.sync += self.commands.valid.eq(1)
+                            m.d.sync += self.commands.payload.opcode.eq(Opcode.MOVE_CURSOR_REL)
+                            m.d.sync += self.commands.payload.params.rel_pos.x_axis.eq(0)
+                            m.d.sync += self.commands.payload.params.rel_pos.reset_other.eq(1)
+                            m.d.sync += self.commands.payload.params.rel_pos.delta.eq(arg_val(0, 1))
                         with m.Case(ord("F")):
-                            # TODO: Previous Line
-                            pass
+                            m.d.sync += self.commands.valid.eq(1)
+                            m.d.sync += self.commands.payload.opcode.eq(Opcode.MOVE_CURSOR_REL)
+                            m.d.sync += self.commands.payload.params.rel_pos.x_axis.eq(0)
+                            m.d.sync += self.commands.payload.params.rel_pos.reset_other.eq(1)
+                            m.d.sync += self.commands.payload.params.rel_pos.delta.eq(-arg_val(0, 1))
                         with m.Case(ord("G")):
                             # TODO: Horizontal absolute
                             pass
@@ -457,9 +464,6 @@ class TextAnsiEscProcessor(wiring.Component):
                         with m.Case(ord("m")):
                             # TODO: SGR
                             pass
-
-
-                    m.next = "idle"
 
         return m
 
