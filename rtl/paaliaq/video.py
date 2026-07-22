@@ -64,7 +64,6 @@ class Opcode(enum.Enum, shape=4):
     # Set the attribute flags for the next characters.
     SET_ATTR    = 3
     # Scroll the display in the specified direction by the specified amount of lines.
-    # Also moves the cursor by that amount.
     SCROLL      = 4
     # Move the cursor to the specified absolute position.
     MOVE_CURSOR_ABS = 6
@@ -240,7 +239,7 @@ class TextCommandProcessor(wiring.Component):
                 with m.Elif(cur_command.params.rel_pos.delta < 0):
                     m.d.sync += scroll_src.eq(128 * 48 - 1)
                     m.d.sync += scroll_dst.eq(128 * 48 - 1 + (-cur_command.params.rel_pos.delta) * 128)
-                    m.d.sync += scroll_ctr.eq(128 * 48)
+                    m.d.sync += scroll_ctr.eq(128 * (48 + (-cur_command.params.rel_pos.delta)))
                     m.d.sync += scroll_fwd.eq(0)
                     m.next = "do-scroll-read"
                 with m.Else():
