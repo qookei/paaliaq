@@ -90,6 +90,8 @@ class Command(data.Struct):
         abs_pos: data.StructLayout({
             "x": unsigned(7),
             "y": unsigned(6),
+            "set_x": unsigned(1),
+            "set_y": unsigned(1),
         })
         rel_pos: data.StructLayout({
             "x_axis": unsigned(1),
@@ -246,8 +248,10 @@ class TextCommandProcessor(wiring.Component):
                 with m.Else():
                     m.next = "idle"
             with m.State("handle-MOVE_CURSOR_ABS"):
-                m.d.sync += cursor_x.eq(cur_command.params.abs_pos.x)
-                m.d.sync += cursor_y.eq(cur_command.params.abs_pos.y)
+                with m.If(cur_command.params.abs_pos.set_x):
+                    m.d.sync += cursor_x.eq(cur_command.params.abs_pos.x)
+                with m.If(cur_command.params.abs_pos.set_y):
+                    m.d.sync += cursor_y.eq(cur_command.params.abs_pos.y)
                 m.next = "idle"
             with m.State("handle-MOVE_CURSOR_REL"):
                 with m.If(cur_command.params.rel_pos.x_axis):
@@ -436,13 +440,18 @@ class TextAnsiEscProcessor(wiring.Component):
                             m.d.sync += self.commands.payload.params.rel_pos.reset_other.eq(1)
                             m.d.sync += self.commands.payload.params.rel_pos.delta.eq(-arg_val(0, 1))
                         with m.Case(ord("G")):
-                            # TODO: Horizontal absolute
-                            pass
+                            m.d.sync += self.commands.valid.eq(1)
+                            m.d.sync += self.commands.payload.opcode.eq(Opcode.MOVE_CURSOR_ABS)
+                            m.d.sync += self.commands.payload.params.abs_pos.x.eq(saturate(arg_val(0, 1) - 1, 127))
+                            m.d.sync += self.commands.payload.params.abs_pos.set_x.eq(1)
+                            m.d.sync += self.commands.payload.params.abs_pos.set_y.eq(0)
                         with m.Case(ord("H"), ord("f")):
                             m.d.sync += self.commands.valid.eq(1)
                             m.d.sync += self.commands.payload.opcode.eq(Opcode.MOVE_CURSOR_ABS)
                             m.d.sync += self.commands.payload.params.abs_pos.x.eq(saturate(arg_val(1, 1) - 1, 127))
                             m.d.sync += self.commands.payload.params.abs_pos.y.eq(saturate(arg_val(0, 1) - 1, 47))
+                            m.d.sync += self.commands.payload.params.abs_pos.set_x.eq(1)
+                            m.d.sync += self.commands.payload.params.abs_pos.set_y.eq(1)
                         with m.Case(ord("J")):
                             m.d.sync += self.commands.valid.eq(1)
                             m.d.sync += self.commands.payload.opcode.eq(Opcode.ERASE_DISPLAY)
