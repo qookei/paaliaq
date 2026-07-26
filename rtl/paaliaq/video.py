@@ -63,8 +63,10 @@ class Opcode(enum.Enum, shape=4):
     SET_BG      = 2
     # Set the attribute flags for the next characters.
     SET_ATTR    = 3
+    # Clear the attribute flags for the next characters.
+    CLEAR_ATTR  = 4
     # Scroll the display in the specified direction by the specified amount of lines.
-    SCROLL      = 4
+    SCROLL      = 5
     # Move the cursor to the specified absolute position.
     MOVE_CURSOR_ABS = 6
     # Move the cursor by the specified relative amounts.
@@ -76,10 +78,19 @@ class Opcode(enum.Enum, shape=4):
     ERASE_DISPLAY = 9
     # Clears the display and resets the cursor position, current color and attributes.
     RESET = 10
+    # Reset attributes and colors to defaults, keep cursor position and display contents.
+    RESET_ATTRS = 11
 
 
 class Attributes(enum.Flag, shape=8):
+    # Swap the foreground and background colors.
     INVERT = 1
+    # Draw a strike-through line.
+    STRIKE = 2
+    # Draw an underline.
+    UNDERLINE = 4
+    # Draw an overline.
+    OVERLINE = 8
 
 
 class Command(data.Struct):
@@ -164,6 +175,8 @@ class TextCommandProcessor(wiring.Component):
                             m.next = "handle-SET_BG"
                         with m.Case(Opcode.SET_ATTR):
                             m.next = "handle-SET_ATTR"
+                        with m.Case(Opcode.CLEAR_ATTR):
+                            m.next = "handle-CLEAR_ATTR"
                         with m.Case(Opcode.SCROLL):
                             m.next = "handle-SCROLL"
                         with m.Case(Opcode.MOVE_CURSOR_ABS):
@@ -176,6 +189,8 @@ class TextCommandProcessor(wiring.Component):
                             m.next = "handle-ERASE_DISPLAY"
                         with m.Case(Opcode.RESET):
                             m.next = "handle-RESET"
+                        with m.Case(Opcode.RESET_ATTRS):
+                            m.next = "handle-RESET_ATTRS"
 
             with m.State("handle-PUT_CHAR"):
                 with m.Switch(cur_command.params.char):
@@ -230,7 +245,10 @@ class TextCommandProcessor(wiring.Component):
                 m.d.sync += cur_bg.eq(cur_command.params.color)
                 m.next = "idle"
             with m.State("handle-SET_ATTR"):
-                m.d.sync += cur_attr.eq(cur_command.params.attr)
+                m.d.sync += cur_attr.eq(cur_attr | cur_command.params.attr)
+                m.next = "idle"
+            with m.State("handle-CLEAR_ATTR"):
+                m.d.sync += cur_attr.eq(cur_attr & (~cur_command.params.attr))
                 m.next = "idle"
             with m.State("handle-SCROLL"):
                 with m.If(cur_command.params.rel_pos.delta > 0):
@@ -286,6 +304,11 @@ class TextCommandProcessor(wiring.Component):
                 m.d.sync += erase_cur.eq(0)
                 m.d.sync += erase_goal.eq(128 * 48 - 1)
                 m.next = "do-erase"
+            with m.State("handle-RESET_ATTRS"):
+                m.d.sync += cur_fg.eq(15)
+                m.d.sync += cur_bg.eq(0)
+                m.d.sync += cur_attr.eq(0)
+                m.next = "idle"
             with m.State("do-erase"):
                 with m.If(erase_cur == erase_goal):
                     m.next = "idle"
@@ -348,11 +371,14 @@ class TextAnsiEscProcessor(wiring.Component):
 
         csi_question_mark = Signal()
 
-        max_args = 3
+        max_args = 16
         num_args = Array([Signal(16) for _ in range(max_args + 1)])
         num_idx = Signal(range(max_args + 1))
 
         cur_num = num_args[num_idx]
+
+        sgr_in_progress = Signal()
+        sgr_pos = Signal(range(max_args + 1))
 
         def arg_val(n, default):
             return Mux(n >= num_idx, default, num_args[n])
@@ -360,7 +386,7 @@ class TextAnsiEscProcessor(wiring.Component):
         with m.If(self.commands.valid):
             with m.If(self.commands.ready):
                 m.d.sync += self.commands.valid.eq(0)
-        with m.Elif(self.chars.valid):
+        with m.Elif(self.chars.valid & ~sgr_in_progress):
             with m.FSM():
                 with m.State("idle"):
                     m.d.comb += self.chars.ready.eq(1)
@@ -471,8 +497,103 @@ class TextAnsiEscProcessor(wiring.Component):
                             m.d.sync += self.commands.payload.opcode.eq(Opcode.SCROLL)
                             m.d.sync += self.commands.payload.params.rel_pos.delta.eq(-arg_val(0, 1))
                         with m.Case(ord("m")):
-                            # TODO: SGR
-                            pass
+                            m.d.sync += sgr_pos.eq(0)
+                            m.d.sync += sgr_in_progress.eq(1)
+
+        with m.If(~self.commands.valid & sgr_in_progress):
+            with m.If(sgr_pos >= num_idx - 1):
+                m.d.sync += sgr_in_progress.eq(0)
+
+            m.d.sync += sgr_pos.eq(sgr_pos + 1)
+
+            def sgr_val(off=0):
+                return arg_val(sgr_pos + off, 0)
+
+            with m.If(sgr_pos < num_idx):
+                with m.Switch(sgr_val()):
+                    # Colors
+                    with m.Case(*range(30, 38)):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_FG)
+                        m.d.sync += self.commands.payload.params.color.eq(sgr_val() - 30)
+                    with m.Case(39):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_FG)
+                        m.d.sync += self.commands.payload.params.color.eq(15)
+                    with m.Case(*range(90, 98)):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_FG)
+                        m.d.sync += self.commands.payload.params.color.eq(sgr_val() - 90 + 8)
+                    with m.Case(38):
+                        with m.If(sgr_val(1) == 5):
+                            m.d.sync += self.commands.valid.eq(1)
+                            m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_FG)
+                            m.d.sync += self.commands.payload.params.color.eq(sgr_val(2))
+                            m.d.sync += sgr_pos.eq(sgr_pos + 3)
+                        with m.Elif(sgr_val(1) == 2):
+                            m.d.sync += sgr_pos.eq(sgr_pos + 5)
+                    with m.Case(*range(40, 48)):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_BG)
+                        m.d.sync += self.commands.payload.params.color.eq(sgr_val() - 40)
+                    with m.Case(49):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_BG)
+                        m.d.sync += self.commands.payload.params.color.eq(0)
+                    with m.Case(*range(100, 108)):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_BG)
+                        m.d.sync += self.commands.payload.params.color.eq(sgr_val() - 100 + 8)
+                    with m.Case(48):
+                        with m.If(sgr_val(1) == 5):
+                            m.d.sync += self.commands.valid.eq(1)
+                            m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_BG)
+                            m.d.sync += self.commands.payload.params.color.eq(sgr_val(2))
+                            m.d.sync += sgr_pos.eq(sgr_pos + 3)
+                        with m.Elif(sgr_val(1) == 2):
+                            m.d.sync += sgr_pos.eq(sgr_pos + 5)
+                            # Attributes
+                    with m.Case(0):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.RESET_ATTRS)
+                    with m.Case(1):
+                        # TODO: Bold
+                        pass
+                    with m.Case(2):
+                        # TODO: Faint
+                        pass
+                    with m.Case(4):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.UNDERLINE)
+                    with m.Case(7):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.INVERT)
+                    with m.Case(9):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.STRIKE)
+                    with m.Case(24):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.UNDERLINE)
+                    with m.Case(27):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.INVERT)
+                    with m.Case(29):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.STRIKE)
+                    with m.Case(53):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.OVERLINE)
+                    with m.Case(55):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.OVERLINE)
 
         return m
 
