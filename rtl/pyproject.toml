@@ -27,3 +27,4 @@ distribution = false
 [tool.pdm.scripts]
 _.env_file = ".env.toolchain"
 build-artix7 = {cmd = "python -m paaliaq.build"}
+tests = {cmd = "python -m pytest -rs tests"}
