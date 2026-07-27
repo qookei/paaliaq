@@ -15,6 +15,19 @@
 	jmp main))
 
  (.rodata
+  (.asciz reset-term-str "\x1bc")
+
+  (.asciz color-cube-str
+	  (apply string-append
+		 (map (λ (y)
+			(format
+			 #f "~a\r\n"
+			 (apply string-append
+				(map (λ (x)
+				       (format #f "\x1b[48;5;~am  \x1b[0m" (+ x (* y 16))))
+				     (iota 16)))))
+		      (iota 16))))
+
   (.asciz header-str (format #f "\r\n\r\n\r\nPaaliaq boot0, rev ~a.\r\n"
 			     (getenv "GIT_REV")))
 
@@ -35,7 +48,8 @@
 
  (.text
   (proc main .a-bits 16 .xy-bits 16
-	jsr video-clear
+	ldx (imm reset-term-str)
+	jsr puts
 
 	ldx (imm header-str)
 	jsr puts
@@ -48,9 +62,10 @@
 	ldx (imm sdram-init-done-str)
 	jsr puts
 
-	jsr video-show-colors
-
 	jsr pmc-measure
+
+	ldx (imm color-cube-str)
+	jsr puts
 
 	#:prompt
 	ldx (imm choices-str)
@@ -77,7 +92,6 @@
 	#:bad-choice
 	ldx (imm bad-choice-str)
 	jsr puts
-	jsr video-scroll
 	bra choice
 
 	#:do-memory-test
