@@ -4,6 +4,13 @@ from amaranth.lib.wiring import In, Out
 
 from dataclasses import dataclass, field
 
+TMDS_CONTROL_SYMBOLS = [
+    0b1101010100,
+    0b0010101011,
+    0b0101010100,
+    0b1010101011,
+]
+
 
 class TMDSEncoder(wiring.Component):
     active: In(1)
@@ -12,6 +19,7 @@ class TMDSEncoder(wiring.Component):
     c1: In(1)
 
     data_out: Out(10)
+    balance_out: Out(signed(6))
 
     def elaborate(self, platform):
         m = Module()
@@ -57,18 +65,15 @@ class TMDSEncoder(wiring.Component):
                 m.d.comb += out[:8].eq(data_min[:8])
                 m.d.sync += cnt.eq(cnt - 2 * (~data_min[8]) + min_1_cnt - min_0_cnt)
 
+        m.d.comb += self.balance_out.eq(cnt)
+
         with m.If(self.active):
             m.d.sync += self.data_out.eq(out)
         with m.Else():
             m.d.sync += [
                 cnt.eq(0),
                 self.data_out.eq(
-                    Array([
-                        0b1101010100,
-                        0b0010101011,
-                        0b0101010100,
-                        0b1010101011,
-                    ])[Cat(self.c0, self.c1)]
+                    Array(TMDS_CONTROL_SYMBOLS)[Cat(self.c0, self.c1)]
                 ),
             ]
 
