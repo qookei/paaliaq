@@ -422,7 +422,7 @@ class TextAnsiEscProcessor(wiring.Component):
                 with m.State("csi-numarg"):
                     with m.If((self.chars.payload >= ord("0")) & (self.chars.payload <= ord("9"))):
                         m.d.comb += self.chars.ready.eq(1)
-                        m.d.sync += cur_num.eq(cur_num * 10 + self.chars.payload - ord("0"))
+                        m.d.sync += cur_num.eq(saturate(cur_num * 10 + self.chars.payload - ord("0"), 65535))
                     with m.Elif(self.chars.payload == ord(";")):
                         m.d.comb += self.chars.ready.eq(1)
                         m.d.sync += num_idx.eq(num_idx + 1)
