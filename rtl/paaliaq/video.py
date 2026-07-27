@@ -642,6 +642,8 @@ class TextFramebuffer(wiring.Component):
             init=get_font_data(),
         )
 
+        colors = Array(gen_color_palette())
+
         def delayed(sig, by):
             x = sig
             for i in range(by):
@@ -651,31 +653,52 @@ class TextFramebuffer(wiring.Component):
 
             return x
 
-        cursor_blink = Signal(range(64))
+        blink_ctr = Signal(range(30))
+        blink_state = Signal()
         with m.If(seq.v_start):
-            m.d.sync += cursor_blink.eq(cursor_blink + 1)
+            m.d.sync += blink_ctr.eq(blink_ctr + 1)
+            with m.If(blink_ctr == 29):
+                m.d.sync += blink_ctr.eq(0)
+                m.d.sync += blink_state.eq(~blink_state)
 
-        font_rd = font.read_port(domain="pixel")
+        cursor_blink_ctr = Signal(range(64))
+        with m.If(seq.v_start):
+            m.d.sync += cursor_blink_ctr.eq(cursor_blink_ctr + 1)
+        cursor_blink = (cursor_blink_ctr >> 4).bool()
 
+        # Stage 1 - read character cell from screen memory
         m.d.comb += self.fb_read.addr.eq((seq.h_pos >> 3) + (seq.v_pos >> 4) * 128)
 
-        char, fg, bg = Signal(8), Signal(8), Signal(8)
-        m.d.comb += char.eq(self.fb_read.data.char)
-        m.d.comb += fg.eq(self.fb_read.data.fg)
-        m.d.comb += bg.eq(self.fb_read.data.bg)
+        fg = delayed(self.fb_read.data.fg, 1)
+        bg = delayed(self.fb_read.data.bg, 1)
+        attr = delayed(self.fb_read.data.attr, 1)
 
-        m.d.comb += font_rd.addr.eq(char * 16 + (seq.v_pos & 15))
+        # Stage 2 - read glyph from font memory
+        font_rd = font.read_port(domain="pixel")
+        m.d.comb += font_rd.addr.eq(self.fb_read.data.char * 16 + (seq.v_pos & 15))
 
-        colors = Array(gen_color_palette())
+        pixel_x = delayed(seq.h_pos, 2)
+        pixel_y = seq.v_pos
 
-        cell_x = delayed(seq.h_pos, 2)
-        font_bit = font_rd.data[::-1].bit_select(cell_x & 7, 1)
-        in_cursor_cell = ((cell_x >> 3) == self.cursor_x) & ((seq.v_pos >> 4) == self.cursor_y)
-        in_cursor_line = in_cursor_cell & ((seq.v_pos & 0b1110) == 0b1110) & ((cursor_blink >> 4) & 1)
-        bit = in_cursor_line | font_bit
+        char_x = pixel_x >> 3
+        char_y = pixel_y >> 4
+
+        cell_x = pixel_x & 0b111
+        cell_y = pixel_y & 0b1111
+
+        font_bit = font_rd.data[::-1].bit_select(cell_x, 1)
+        overline_bit = (attr & Attributes.OVERLINE).as_value().bool() & (cell_y == 1)
+        underline_bit = (attr & Attributes.UNDERLINE).as_value().bool() & (cell_y == 14)
+        strike_bit = (attr & Attributes.STRIKE).as_value().bool() & (cell_y == 7)
+        blink_bit = ~((attr & Attributes.BLINK).as_value().bool()) | blink_state
+        cursor_bit = (char_x == self.cursor_x) & (char_y == self.cursor_y) & (cell_y >= 14) & cursor_blink
+
+        invert_bit = (attr & Attributes.INVERT).as_value().bool()
+
+        pixel_bit = ((font_bit | overline_bit | underline_bit | strike_bit | cursor_bit) & blink_bit) ^ invert_bit
 
         m.d.sync += Cat(enc.blue, enc.green, enc.red).eq(
-            colors[Mux(bit, delayed(fg, 1), delayed(bg, 1))]
+            colors[Mux(pixel_bit, fg, bg)]
         )
 
         return m
