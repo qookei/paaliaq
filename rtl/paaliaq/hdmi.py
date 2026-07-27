@@ -13,7 +13,6 @@ class TMDSEncoder(wiring.Component):
 
     data_out: Out(10)
 
-
     def elaborate(self, platform):
         m = Module()
 
@@ -33,31 +32,36 @@ class TMDSEncoder(wiring.Component):
 
         min_1_cnt = sum(data_min[0:8])
         min_0_cnt = 8 - min_1_cnt
-        min_balance = min_1_cnt - min_0_cnt
-        total_balance = Signal(signed(4))
+        cnt = Signal(signed(6))
 
         out = Signal(10)
 
-        with m.If((min_balance == 0) | (total_balance == 0)):
+        with m.If((cnt == 0) | (min_1_cnt == min_0_cnt)):
+            m.d.comb += out[9].eq(~data_min[8])
+            m.d.comb += out[8].eq(data_min[8])
+            m.d.comb += out[:8].eq(Mux(data_min[8], data_min[:8], ~data_min[:8]))
+
             with m.If(data_min[8]):
-                m.d.comb += out.eq(Cat(data_min, 0))
-                m.d.sync += total_balance.eq(total_balance + min_balance)
+                m.d.sync += cnt.eq(cnt + min_1_cnt - min_0_cnt)
             with m.Else():
-                m.d.comb += out.eq(Cat(~data_min[0:8], 0, 1))
-                m.d.sync += total_balance.eq(total_balance - min_balance)
+                m.d.sync += cnt.eq(cnt + min_0_cnt - min_1_cnt)
         with m.Else():
-            with m.If((min_balance > 0) == (total_balance > 0)):
-                m.d.comb += out.eq(Cat(~data_min[0:8], data_min[8], 1))
-                m.d.sync += total_balance.eq(total_balance + 2 * data_min[8] - min_balance)
+            with m.If(((cnt > 0) & (min_1_cnt > min_0_cnt)) | ((cnt < 0) & (min_0_cnt > min_1_cnt))):
+                m.d.comb += out[9].eq(1)
+                m.d.comb += out[8].eq(data_min[8])
+                m.d.comb += out[:8].eq(~data_min[:8])
+                m.d.sync += cnt.eq(cnt + 2 * data_min[8] + min_0_cnt - min_1_cnt)
             with m.Else():
-                m.d.comb += out.eq(Cat(data_min, 0))
-                m.d.sync += total_balance.eq(total_balance - 2 * (~data_min[8]) + min_balance)
+                m.d.comb += out[9].eq(0)
+                m.d.comb += out[8].eq(data_min[8])
+                m.d.comb += out[:8].eq(data_min[:8])
+                m.d.sync += cnt.eq(cnt - 2 * (~data_min[8]) + min_1_cnt - min_0_cnt)
 
         with m.If(self.active):
             m.d.sync += self.data_out.eq(out)
         with m.Else():
             m.d.sync += [
-                total_balance.eq(0),
+                cnt.eq(0),
                 self.data_out.eq(
                     Array([
                         0b1101010100,
