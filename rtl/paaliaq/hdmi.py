@@ -84,6 +84,7 @@ class VideoMode:
     h_front_porch: int
     h_back_porch: int
     h_sync: int
+    h_invert: bool
     h_total: int = field(init=False)
     h_active_start: int = field(init=False)
     h_active_end: int = field(init=False)
@@ -92,6 +93,7 @@ class VideoMode:
     v_front_porch: int
     v_back_porch: int
     v_sync: int
+    v_invert: bool
     v_total: int = field(init=False)
     v_active_start: int = field(init=False)
     v_active_end: int = field(init=False)
@@ -118,9 +120,11 @@ DMT_MODE_640x480_60Hz = VideoMode(
     h_front_porch=16,
     h_back_porch=48,
     h_sync=96,
+    h_invert=True,
     v_front_porch=10,
     v_back_porch=33,
     v_sync=2,
+    v_invert=True,
 )
 
 DMT_MODE_800x600_60Hz = VideoMode(
@@ -130,9 +134,11 @@ DMT_MODE_800x600_60Hz = VideoMode(
     h_front_porch=40,
     h_back_porch=88,
     h_sync=128,
+    h_invert=False,
     v_front_porch=1,
     v_back_porch=23,
     v_sync=4,
+    v_invert=False,
 )
 
 DMT_MODE_1024x768_60Hz = VideoMode(
@@ -142,9 +148,11 @@ DMT_MODE_1024x768_60Hz = VideoMode(
     h_front_porch=24,
     h_back_porch=160,
     h_sync=136,
+    h_invert=True,
     v_front_porch=3,
     v_back_porch=29,
     v_sync=6,
+    v_invert=True,
 )
 
 CTA_MODE_1280x720_60Hz = VideoMode(
@@ -154,9 +162,11 @@ CTA_MODE_1280x720_60Hz = VideoMode(
     h_front_porch=110,
     h_back_porch=220,
     h_sync=40,
+    h_invert=False,
     v_front_porch=5,
     v_back_porch=20,
     v_sync=5,
+    v_invert=False,
 )
 
 SMPTE_MODE_1920x1080_30Hz = VideoMode(
@@ -166,9 +176,11 @@ SMPTE_MODE_1920x1080_30Hz = VideoMode(
     h_front_porch=88,
     h_back_porch=148,
     h_sync=44,
+    h_invert=False,
     v_front_porch=4,
     v_back_porch=36,
     v_sync=5,
+    v_invert=False,
 )
 
 
@@ -203,14 +215,12 @@ class VideoSequencer(wiring.Component):
         h_active = (h_pos >= mode.h_active_start) & (h_pos < mode.h_active_end)
         v_active = (v_pos >= mode.v_active_start) & (v_pos < mode.v_active_end)
 
-        first_v_sync_line = v_pos == mode.v_sync_start
-        last_v_sync_line = v_pos == mode.v_sync_start + mode.v_sync - 1
         v_sync = v_pos >= mode.v_sync_start
         h_sync = h_pos >= mode.h_sync_start
 
         m.d.sync += [
-            self.h_sync.eq(h_sync),
-            self.v_sync.eq(Mux(first_v_sync_line, h_sync, Mux(last_v_sync_line, ~h_sync, v_sync))),
+            self.h_sync.eq(h_sync ^ self.mode.h_invert),
+            self.v_sync.eq(v_sync ^ self.mode.v_invert),
             self.active.eq(h_active & v_active),
         ]
 
