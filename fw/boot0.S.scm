@@ -147,6 +147,12 @@
 
 	;; Perform ICRNL
 	cmp ,(char->integer #\cr)
+	bne not-cr
+	lda ,(char->integer #\nl)
+
+	#:not-cr
+	;; Perform ONLCR
+	cmp ,(char->integer #\nl)
 	bne just-putc
 	jsr nl
 	bra loop
