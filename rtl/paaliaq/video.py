@@ -91,6 +91,8 @@ class Attributes(enum.Flag, shape=8):
     UNDERLINE = 4
     # Draw an overline.
     OVERLINE = 8
+    # Periodically toggle the foreground part of the cell on and off.
+    BLINK = 16
 
 
 class Command(data.Struct):
@@ -350,7 +352,6 @@ class TextCommandProcessor(wiring.Component):
         return m
 
 
-
 class TextAnsiEscProcessor(wiring.Component):
     chars: In(stream.Signature(unsigned(8)))
     commands: Out(stream.Signature(Command))
@@ -570,6 +571,10 @@ class TextAnsiEscProcessor(wiring.Component):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
                         m.d.sync += self.commands.payload.params.attr.eq(Attributes.UNDERLINE)
+                    with m.Case(5, 6):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.BLINK)
                     with m.Case(7):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
@@ -582,6 +587,10 @@ class TextAnsiEscProcessor(wiring.Component):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
                         m.d.sync += self.commands.payload.params.attr.eq(Attributes.UNDERLINE)
+                    with m.Case(25):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.BLINK)
                     with m.Case(27):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
