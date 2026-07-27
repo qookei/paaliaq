@@ -437,21 +437,25 @@ class TextAnsiEscProcessor(wiring.Component):
                             m.d.sync += self.commands.valid.eq(1)
                             m.d.sync += self.commands.payload.opcode.eq(Opcode.MOVE_CURSOR_REL)
                             m.d.sync += self.commands.payload.params.rel_pos.x_axis.eq(0)
+                            m.d.sync += self.commands.payload.params.rel_pos.reset_other.eq(0)
                             m.d.sync += self.commands.payload.params.rel_pos.delta.eq(-arg_val(0, 1))
                         with m.Case(ord("B")):
                             m.d.sync += self.commands.valid.eq(1)
                             m.d.sync += self.commands.payload.opcode.eq(Opcode.MOVE_CURSOR_REL)
                             m.d.sync += self.commands.payload.params.rel_pos.x_axis.eq(0)
+                            m.d.sync += self.commands.payload.params.rel_pos.reset_other.eq(0)
                             m.d.sync += self.commands.payload.params.rel_pos.delta.eq(arg_val(0, 1))
                         with m.Case(ord("C")):
                             m.d.sync += self.commands.valid.eq(1)
                             m.d.sync += self.commands.payload.opcode.eq(Opcode.MOVE_CURSOR_REL)
                             m.d.sync += self.commands.payload.params.rel_pos.x_axis.eq(1)
+                            m.d.sync += self.commands.payload.params.rel_pos.reset_other.eq(0)
                             m.d.sync += self.commands.payload.params.rel_pos.delta.eq(arg_val(0, 1))
                         with m.Case(ord("D")):
                             m.d.sync += self.commands.valid.eq(1)
                             m.d.sync += self.commands.payload.opcode.eq(Opcode.MOVE_CURSOR_REL)
                             m.d.sync += self.commands.payload.params.rel_pos.x_axis.eq(1)
+                            m.d.sync += self.commands.payload.params.rel_pos.reset_other.eq(0)
                             m.d.sync += self.commands.payload.params.rel_pos.delta.eq(-arg_val(0, 1))
                         with m.Case(ord("E")):
                             m.d.sync += self.commands.valid.eq(1)
