@@ -680,14 +680,14 @@ class TextAnsiTerminal(wiring.Component):
 
     class StatusRegister(csr.Register, access="r"):
         reserved: csr.Field(csr.action.ResR0WA, 7)
-        full: csr.Field(csr.action.R, 1)
+        ready: csr.Field(csr.action.R, 1)
 
     def __init__(self):
         super().__init__()
 
         regs = csr.Builder(addr_width=4, data_width=8)
         self._char = regs.add("Char", self.CharRegister())
-        self._status = regs.add("Status", self.StatusRegister(), offset=2)
+        self._status = regs.add("Status", self.StatusRegister())
         mmap = regs.as_memory_map()
 
         self._bridge = csr.Bridge(mmap)
@@ -736,14 +736,14 @@ class TextAnsiTerminal(wiring.Component):
 
         m.submodules.char_cdc_fifo = char_cdc_fifo = AsyncFIFOBuffered(
             width=8,
-            depth=4,
+            depth=256,
             w_domain="sync",
             r_domain="pixel")
 
         m.d.comb += [
             char_cdc_fifo.w_data.eq(self._char.f.char.w_data),
             char_cdc_fifo.w_en.eq(self._char.f.char.w_stb),
-            self._status.f.full.r_data.eq(~char_cdc_fifo.w_rdy),
+            self._status.f.ready.r_data.eq(char_cdc_fifo.w_rdy),
         ]
 
         wiring.connect(m, ansi.chars, char_cdc_fifo.r_stream)

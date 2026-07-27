@@ -14,9 +14,9 @@
 	plb plb
 
 	,.a8
-	#:tx-full
+	#:not-ready
 	bit (abs ,VIDEO-STATUS)
-	bmi tx-full
+	bpl not-ready
 
 	sta (abs ,VIDEO-CHAR)
 

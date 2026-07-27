@@ -31,7 +31,7 @@ class UARTPeripheral(wiring.Component):
         data: csr.Field(csr.action.R, 8)
 
 
-    def __init__(self, *, baudrate=115200, tx_fifo_depth=16, rx_fifo_depth=16):
+    def __init__(self, *, baudrate=115200, tx_fifo_depth=256, rx_fifo_depth=256):
         super().__init__()
 
         regs = csr.Builder(addr_width=3, data_width=8)
