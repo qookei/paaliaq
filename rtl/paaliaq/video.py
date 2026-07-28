@@ -420,6 +420,8 @@ class TextAnsiEscProcessor(wiring.Component):
                         m.d.sync += num_args[0].eq(0)
                         m.next = "csi-numarg"
                     with m.Else():
+                        m.d.sync += num_idx.eq(0)
+                        m.d.sync += num_args[0].eq(0)
                         m.next = "csi-act"
                 with m.State("csi-numarg"):
                     with m.If((self.chars.payload >= ord("0")) & (self.chars.payload <= ord("9"))):
