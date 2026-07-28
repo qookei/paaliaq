@@ -93,6 +93,8 @@ class Attributes(enum.Flag, shape=8):
     OVERLINE = 8
     # Periodically toggle the foreground part of the cell on and off.
     BLINK = 16
+    # Make the character italicized.
+    ITALIC = 32
 
 
 class Command(data.Struct):
@@ -567,6 +569,10 @@ class TextAnsiEscProcessor(wiring.Component):
                     with m.Case(2):
                         # TODO: Faint
                         pass
+                    with m.Case(3):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.ITALIC)
                     with m.Case(4):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
@@ -583,6 +589,10 @@ class TextAnsiEscProcessor(wiring.Component):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
                         m.d.sync += self.commands.payload.params.attr.eq(Attributes.STRIKE)
+                    with m.Case(23):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.ITALIC)
                     with m.Case(24):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
