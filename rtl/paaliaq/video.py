@@ -696,14 +696,17 @@ class TextFramebuffer(wiring.Component):
         cell_x = pixel_x & 0b111
         cell_y = pixel_y & 0b1111
 
-        font_bit = font_rd.data[::-1].bit_select(cell_x, 1)
-        overline_bit = (attr & Attributes.OVERLINE).as_value().bool() & (cell_y == 1)
-        underline_bit = (attr & Attributes.UNDERLINE).as_value().bool() & (cell_y == 14)
+        invert_bit = (attr & Attributes.INVERT).as_value().bool()
         strike_bit = (attr & Attributes.STRIKE).as_value().bool() & (cell_y == 7)
+        underline_bit = (attr & Attributes.UNDERLINE).as_value().bool() & (cell_y == 14)
+        overline_bit = (attr & Attributes.OVERLINE).as_value().bool() & (cell_y == 1)
         blink_bit = ~((attr & Attributes.BLINK).as_value().bool()) | blink_state
+        italic_bit = ~((attr & Attributes.ITALIC).as_value().bool()) | (cell_y < 8)
+
         cursor_bit = (char_x == self.cursor_x) & (char_y == self.cursor_y) & (cell_y >= 14) & cursor_blink
 
-        invert_bit = (attr & Attributes.INVERT).as_value().bool()
+        font_row = Mux(italic_bit, font_rd.data[::-1], font_rd.data[::-1] << 1)
+        font_bit = font_row.bit_select(cell_x, 1)
 
         pixel_bit = ((font_bit | overline_bit | underline_bit | strike_bit | cursor_bit) & blink_bit) ^ invert_bit
 
