@@ -518,7 +518,7 @@ class TextAnsiEscProcessor(wiring.Component):
             def sgr_val(off=0):
                 return arg_val(sgr_pos + off, 0)
 
-            with m.If(sgr_pos < num_idx):
+            with m.If((sgr_pos < num_idx) | (sgr_pos == 0)):
                 with m.Switch(sgr_val()):
                     # Colors
                     with m.Case(*range(30, 38)):
