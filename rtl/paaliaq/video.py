@@ -145,13 +145,16 @@ class TextCommandProcessor(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
+        DEFAULT_FG = 7
+        DEFAULT_BG = 0
+
         cursor_x, cursor_y = Signal(7), Signal(6)
         cursor_addr = cursor_y * 128 + cursor_x
 
         m.d.comb += self.cursor_x.eq(cursor_x)
         m.d.comb += self.cursor_y.eq(cursor_y)
 
-        cur_fg, cur_bg, cur_attr = Signal(8, init=15), Signal(8), Signal(Attributes)
+        cur_fg, cur_bg, cur_attr = Signal(8, init=DEFAULT_FG), Signal(8, init=DEFAULT_BG), Signal(Attributes)
 
         mem_addr = Signal(13)
 
@@ -304,15 +307,15 @@ class TextCommandProcessor(wiring.Component):
             with m.State("handle-RESET"):
                 m.d.sync += cursor_x.eq(0)
                 m.d.sync += cursor_y.eq(0)
-                m.d.sync += cur_fg.eq(15)
-                m.d.sync += cur_bg.eq(0)
+                m.d.sync += cur_fg.eq(DEFAULT_FG)
+                m.d.sync += cur_bg.eq(DEFAULT_BG)
                 m.d.sync += cur_attr.eq(0)
                 m.d.sync += erase_cur.eq(0)
                 m.d.sync += erase_goal.eq(128 * 48 - 1)
                 m.next = "do-erase"
             with m.State("handle-RESET_ATTRS"):
-                m.d.sync += cur_fg.eq(15)
-                m.d.sync += cur_bg.eq(0)
+                m.d.sync += cur_fg.eq(DEFAULT_FG)
+                m.d.sync += cur_bg.eq(DEFAULT_BG)
                 m.d.sync += cur_attr.eq(0)
                 m.next = "idle"
             with m.State("do-erase"):
