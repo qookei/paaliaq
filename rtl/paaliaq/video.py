@@ -671,11 +671,6 @@ class TextFramebuffer(wiring.Component):
                 m.d.sync += blink_ctr.eq(0)
                 m.d.sync += blink_state.eq(~blink_state)
 
-        cursor_blink_ctr = Signal(range(64))
-        with m.If(seq.v_start):
-            m.d.sync += cursor_blink_ctr.eq(cursor_blink_ctr + 1)
-        cursor_blink = (cursor_blink_ctr >> 4).bool()
-
         # Stage 1 - read character cell from screen memory
         m.d.comb += self.fb_read.addr.eq((seq.h_pos >> 3) + (seq.v_pos >> 4) * 128)
 
@@ -703,12 +698,12 @@ class TextFramebuffer(wiring.Component):
         blink_bit = ~((attr & Attributes.BLINK).as_value().bool()) | blink_state
         italic_bit = ~((attr & Attributes.ITALIC).as_value().bool()) | (cell_y < 8)
 
-        cursor_bit = (char_x == self.cursor_x) & (char_y == self.cursor_y) & (cell_y >= 14) & cursor_blink
+        cursor_bit = (char_x == self.cursor_x) & (char_y == self.cursor_y)
 
         font_row = Mux(italic_bit, font_rd.data[::-1], font_rd.data[::-1] << 1)
         font_bit = font_row.bit_select(cell_x, 1)
 
-        pixel_bit = ((font_bit | overline_bit | underline_bit | strike_bit | cursor_bit) & blink_bit) ^ invert_bit
+        pixel_bit = ((font_bit | overline_bit | underline_bit | strike_bit) & blink_bit) ^ invert_bit ^ cursor_bit
 
         m.d.sync += Cat(enc.blue, enc.green, enc.red).eq(
             colors[Mux(pixel_bit, fg, bg)]
