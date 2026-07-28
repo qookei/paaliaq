@@ -388,6 +388,9 @@ class TextAnsiEscProcessor(wiring.Component):
         sgr_in_progress = Signal()
         sgr_pos = Signal(range(max_args + 1))
 
+        utf8_continuations = Signal(range(3))
+        utf8_codepoint = Signal(21)
+
         def arg_val(n, default):
             return Mux(n >= num_idx, default, num_args[n])
 
@@ -400,10 +403,54 @@ class TextAnsiEscProcessor(wiring.Component):
                     m.d.comb += self.chars.ready.eq(1)
                     with m.If(self.chars.payload == 0x1B):
                         m.next = "esc"
+                    with m.Elif(self.chars.payload & 0x80):
+                        with m.If((self.chars.payload & 0b11100000) == 0b11000000):
+                            m.d.sync += utf8_continuations.eq(0)
+                            m.d.sync += utf8_codepoint.eq(self.chars.payload & 0b00011111)
+                            m.next = "utf8-continuation"
+                        with m.Elif((self.chars.payload & 0b11110000) == 0b11100000):
+                            m.d.sync += utf8_continuations.eq(1)
+                            m.d.sync += utf8_codepoint.eq(self.chars.payload & 0b00001111)
+                            m.next = "utf8-continuation"
+                        with m.Elif((self.chars.payload & 0b11111000) == 0b11110000):
+                            m.d.sync += utf8_continuations.eq(2)
+                            m.d.sync += utf8_codepoint.eq(self.chars.payload & 0b00000111)
+                            m.next = "utf8-continuation"
+                        with m.Else():
+                            # TODO: Put replacement character
+                            m.d.sync += self.commands.valid.eq(1)
+                            m.d.sync += self.commands.payload.opcode.eq(Opcode.PUT_CHAR)
+                            m.d.sync += self.commands.payload.params.char.eq(0xFE)
                     with m.Else():
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.PUT_CHAR)
                         m.d.sync += self.commands.payload.params.char.eq(self.chars.payload)
+                with m.State("utf8-continuation"):
+                    with m.If((self.chars.payload & 0b11000000) == 0b10000000):
+                        m.d.comb += self.chars.ready.eq(1)
+                        m.d.sync += utf8_continuations.eq(utf8_continuations - 1)
+                        codepoint = (utf8_codepoint << 6) | (self.chars.payload & 0b00111111)
+                        m.d.sync += utf8_codepoint.eq(codepoint)
+                        with m.If(utf8_continuations == 0):
+                            with m.If((codepoint < 0x100) | (codepoint > 0x10FFFF)):
+                                # Out of bounds
+                                # TODO: Put replacement character
+                                m.d.sync += self.commands.valid.eq(1)
+                                m.d.sync += self.commands.payload.opcode.eq(Opcode.PUT_CHAR)
+                                m.d.sync += self.commands.payload.params.char.eq(0xFE)
+                            with m.Else():
+                                # TODO: Proper handling
+                                m.d.sync += self.commands.valid.eq(1)
+                                m.d.sync += self.commands.payload.opcode.eq(Opcode.PUT_CHAR)
+                                m.d.sync += self.commands.payload.params.char.eq(0xFE)
+                            m.next = "idle"
+                    with m.Else():
+                        # Abandon invalid sequences
+                        # TODO: Put replacement character
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.PUT_CHAR)
+                        m.d.sync += self.commands.payload.params.char.eq(0xFE)
+                        m.next = "idle"
                 with m.State("esc"):
                     m.d.comb += self.chars.ready.eq(1)
                     m.next = "idle"
