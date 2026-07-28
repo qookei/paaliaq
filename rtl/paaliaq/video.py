@@ -95,6 +95,8 @@ class Attributes(enum.Flag, shape=8):
     BLINK = 16
     # Make the character italicized.
     ITALIC = 32
+    # Make the character bold.
+    BOLD = 64
 
 
 class Command(data.Struct):
@@ -566,6 +568,9 @@ class TextAnsiEscProcessor(wiring.Component):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.RESET_ATTRS)
                     with m.Case(1):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.BOLD)
                         # TODO: Bold
                         pass
                     with m.Case(2):
@@ -591,6 +596,10 @@ class TextAnsiEscProcessor(wiring.Component):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.SET_ATTR)
                         m.d.sync += self.commands.payload.params.attr.eq(Attributes.STRIKE)
+                    with m.Case(22):
+                        m.d.sync += self.commands.valid.eq(1)
+                        m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
+                        m.d.sync += self.commands.payload.params.attr.eq(Attributes.BOLD)
                     with m.Case(23):
                         m.d.sync += self.commands.valid.eq(1)
                         m.d.sync += self.commands.payload.opcode.eq(Opcode.CLEAR_ATTR)
