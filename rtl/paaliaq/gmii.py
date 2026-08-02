@@ -1,5 +1,6 @@
 from amaranth import *
 from amaranth.lib import wiring, io, memory, data, stream
+from amaranth.lib.crc.catalog import CRC32_ETHERNET
 from amaranth.lib.wiring import In, Out
 from amaranth_soc import csr
 from amaranth_soc.memory import MemoryMap
@@ -32,14 +33,16 @@ class GMIITx(wiring.Component):
         ]
 
         pre_ctr = Signal(range(8))
+        crc_ctr = Signal(range(4))
         ipg_ctr = Signal(range(12))
+
+        m.submodules.crc = crc = CRC32_ETHERNET().create()
 
         with m.FSM():
             with m.State("idle"):
                 with m.If(self.data.valid):
                     m.d.sync += pre_ctr.eq(0)
                     m.next = "tx-preamble"
-
             with m.State("tx-preamble"):
                 m.d.comb += [
                     tx_en.o.eq(1),
@@ -48,17 +51,33 @@ class GMIITx(wiring.Component):
                 ]
                 m.d.sync += pre_ctr.eq(pre_ctr + 1)
                 with m.If(pre_ctr == 7):
+                    m.d.comb += crc.start.eq(1)
                     m.next = "tx-data"
             with m.State("tx-data"):
                 # TODO: We need self.data.valid to be 1 all throughout here.
                 # Currently we just assume...
                 m.d.comb += [
+                    # Stream control
                     self.data.ready.eq(1),
+                    # GMII interface control
                     tx_en.o.eq(1),
                     tx_er.o.eq(~self.data.valid | self.data.payload.error),
                     txd.o.eq(self.data.payload.value),
+                    # CRC32 processor control
+                    crc.valid.eq(1),
+                    crc.data.eq(self.data.payload.value),
                 ]
                 with m.If(self.data.payload.last):
+                    m.d.sync += crc_ctr.eq(0)
+                    m.next = "tx-crc"
+            with m.State("tx-crc"):
+                m.d.comb += [
+                    tx_en.o.eq(1),
+                    tx_er.o.eq(0),
+                    txd.o.eq(crc.crc.word_select(crc_ctr, 8)),
+                ]
+                m.d.sync += crc_ctr.eq(crc_ctr + 1)
+                with m.If(crc_ctr == 3):
                     m.d.sync += ipg_ctr.eq(0)
                     m.next = "ipg"
             with m.State("ipg"):
@@ -117,7 +136,7 @@ class GMIITxDemo(wiring.Component):
             0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A,
             0x5B, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x61, 0x62,
             0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A,
-            0x6B, 0x6C, 0x6D, 0x6E, 0xF6, 0xA6, 0x0D, 0xEC,
+            0x6B, 0x6C, 0x6D, 0x6E,
         ]
 
         ctr = Signal(range(len(data)))
