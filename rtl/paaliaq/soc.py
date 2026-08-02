@@ -23,6 +23,8 @@ from paaliaq.spi import SPIController
 
 from paaliaq.info import SystemInfo
 
+from paaliaq.gmii import GMIIMac
+
 from amaranth_soc import csr
 from amaranth_soc.csr.wishbone import WishboneCSRBridge
 from amaranth_soc.csr.event import EventMonitor
@@ -157,6 +159,9 @@ class SoC(Elaboratable):
 
         m.submodules.info = info = SystemInfo()
         csr_dec.add(info.csr_bus, name="info")
+
+        m.submodules.gmii = gmii = GMIIMac()
+        csr_dec.add(gmii.csr_bus, name="gmii")
 
         # This freezes the CSR memory map.
         m.submodules.csr_wb = csr_wb = WishboneCSRBridge(csr_dec.bus)
