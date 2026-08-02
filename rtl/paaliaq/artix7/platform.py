@@ -60,8 +60,25 @@ class PaaliaqPlatform(XilinxPlatform):
             data="U20 Y21 V22 W23 AC24 AB25 W24 AC26",
             rwb="W19", vda="V17", vpa="V19", vpb="U14",
             irq="V16", nmi="V18", abort="U15",
-            attrs=Attrs(DRIVE="4", IOSTANDARD="LVCMOS33")
-        )
+            attrs=Attrs(DRIVE="4", IOSTANDARD="LVCMOS33"),
+        ),
+
+        GMIIResource(
+            0,
+            phyrst="R1",
+            rx_clk="P4", rx_dv="L3", rx_er="U5",
+            rxd="M4 N3 N4 P3 R3 T3 T4 T5",
+            gtx_clk="U1", tx_en="T2", tx_er="J1",
+            txd="R2 P1 N2 N1 M1 L2 K2 K1",
+            crs="U2", col="U4",
+            attrs=Attrs(IOSTANDARD="LVCMOS33"),
+        ),
+        MDIOResource(
+            0,
+            mdc="H2",
+            mdio="H1",
+            attrs=Attrs(IOSTANDARD="LVCMOS33"),
+        ),
     ]
 
     connectors = []
